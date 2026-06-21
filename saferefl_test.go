@@ -23,7 +23,7 @@ type address struct {
 }
 
 type employee struct {
-	person           // embedded (promotes Name, Age, Score, Active)
+	person  // embedded (promotes Name, Age, Score, Active)
 	Company string
 	Office  address  // value — dot-path without deref
 	Contact *address // pointer — dot-path with deref

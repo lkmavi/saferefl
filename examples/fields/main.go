@@ -8,10 +8,10 @@ import (
 )
 
 type Product struct {
-	ID       int    `json:"id" db:"product_id"`
-	Name     string `json:"name"`
-	Price    float64
-	inStock  bool // unexported
+	ID      int    `json:"id" db:"product_id"`
+	Name    string `json:"name"`
+	Price   float64
+	inStock bool // unexported
 }
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 	}
 
 	// Fields — from an instance (value or pointer)
-	p := &Product{ID: 1, Name: "Widget", Price: 9.99}
+	p := &Product{ID: 1, Name: "Widget", Price: 9.99, inStock: true}
 	fields, err = saferefl.Fields(p)
 	if err != nil {
 		panic(err)

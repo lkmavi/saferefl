@@ -18,7 +18,7 @@ type Person struct {
 }
 
 type Employee struct {
-	Person          // embedded — Name and Age are promoted
+	Person  // embedded — Name and Age are promoted
 	Company string
 	Office  Address  // value field
 	Home    *Address // pointer field — nil is safe
