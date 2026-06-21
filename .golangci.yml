@@ -137,6 +137,11 @@ linters:
         linters:
           - gosec
 
+      # Layer 1 root package — unsafe used only for zero-copy cast after reflect type verification
+      - path: (get|set|resolve)\.go
+        linters:
+          - gosec
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

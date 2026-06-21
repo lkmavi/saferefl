@@ -56,10 +56,20 @@ jobs:
         with:
           go-version: 'stable'
 
-      - name: Install and download gotip
-        run: |
-          go install golang.org/dl/gotip@latest
-          gotip download
+      - name: Cache gotip SDK
+        id: cache-gotip
+        uses: actions/cache@v4
+        with:
+          path: ~/sdk/gotip
+          key: gotip-${{ runner.os }}-${{ github.sha }}
+          restore-keys: gotip-${{ runner.os }}-
+
+      - name: Install gotip launcher
+        run: go install golang.org/dl/gotip@latest
+
+      - name: Download gotip (compile from source on cache miss)
+        if: steps.cache-gotip.outputs.cache-hit != 'true'
+        run: gotip download
 
       - name: Build with gotip
         run: |
