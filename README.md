@@ -1,5 +1,10 @@
 # saferefl
 
+[![CI](https://github.com/lkmavi/saferefl/actions/workflows/ci.yml/badge.svg)](https://github.com/lkmavi/saferefl/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/lkmavi/saferefl/branch/main/graph/badge.svg)](https://codecov.io/gh/lkmavi/saferefl)
+[![Go Reference](https://pkg.go.dev/badge/github.com/lkmavi/saferefl.svg)](https://pkg.go.dev/github.com/lkmavi/saferefl)
+[![Go 1.22+](https://img.shields.io/badge/Go-1.22+-blue)](https://go.dev/dl/)
+
 Fast, safe reflection for Go — a generic-first alternative to [`reflect2`](https://github.com/modern-go/reflect2).
 
 ## Why
@@ -8,20 +13,113 @@ Fast, safe reflection for Go — a generic-first alternative to [`reflect2`](htt
 
 See [ADR-01](https://github.com/lkmavi/saferefl/discussions/3) for the full analysis and decision.
 
+## Quick Start
+
+```go
+import "github.com/lkmavi/saferefl"
+
+type User struct {
+    Name string
+    Age  int
+    Score float64
+}
+
+u := &User{Name: "Alice", Age: 30, Score: 9.5}
+
+// Read any field by name — type-safe, zero boxing on the fast path
+name, err := saferefl.Get[string](u, "Name")   // "Alice", nil
+age,  err := saferefl.Get[int](u, "Age")        // 30, nil
+
+// Write
+_ = saferefl.Set[string](u, "Name", "Bob")
+_ = saferefl.Set[int](u, "Age", 31)
+
+// Panic variants for statically-known valid paths
+name = saferefl.MustGet[string](u, "Name")
+saferefl.MustSet[float64](u, "Score", 10.0)
+```
+
+### Dot-path traversal
+
+Intermediate struct fields and pointer-to-struct fields are transparently traversed:
+
+```go
+type Address struct {
+    City    string
+    Country string
+}
+
+type Employee struct {
+    User
+    Office  Address
+    Contact *Address
+}
+
+e := &Employee{
+    User:    User{Name: "Carol"},
+    Office:  Address{City: "Berlin"},
+    Contact: &Address{City: "NYC"},
+}
+
+// Promoted field from embedded User
+name, _ := saferefl.Get[string](e, "Name")          // "Carol"
+
+// Value intermediate field
+city, _ := saferefl.Get[string](e, "Office.City")    // "Berlin"
+
+// Pointer intermediate field — nil pointer returns an error, never panics
+city, _ =  saferefl.Get[string](e, "Contact.City")   // "NYC"
+```
+
+### Field inspection
+
+```go
+// Direct fields of a type (no instance needed)
+fields, _ := saferefl.FieldsOf[User]()
+for _, f := range fields {
+    fmt.Println(f.Name, f.Type)
+}
+
+// From an instance (struct value or pointer)
+fields, _ = saferefl.Fields(u)
+
+// Single field lookup
+sf, ok := saferefl.FieldByName[User]("Name")
+```
+
+## Error types
+
+All errors are typed and work with `errors.As`:
+
+| Type | When |
+|---|---|
+| `*FieldNotFoundError` | field path does not exist on the type |
+| `*TypeMismatchError` | field type is not assignable to T |
+| `*ReadOnlyError` | attempted to Set an unexported field |
+
+```go
+_, err := saferefl.Get[int](u, "Name")   // Name is string, not int
+
+var tme *saferefl.TypeMismatchError
+if errors.As(err, &tme) {
+    fmt.Println(tme.FieldType, "vs", tme.WantType) // "string vs int"
+}
+```
+
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
 │  Layer 1: Public API (generics-first)        │  Get[T], Set[T]
 │  - type-safe by construction                 │
-│  - zero unsafe for statically known types    │
+│  - zero-copy fast path for exact types       │
 ├─────────────────────────────────────────────┤
 │  Layer 2: Cached reflective layer            │  TypeDescriptorOf(t)
 │  - built once via stdlib reflect             │
-│  - sync.Map cache on reflect.Type            │
+│  - sync.Map cache keyed on reflect.Type      │
 ├─────────────────────────────────────────────┤
 │  Layer 3: Optional unsafe accelerator        │  build tag: unsafe_accel
-│  - self-test at init, auto-fallback on fail  │
+│  - self-test at init, auto-fallback on fail  │  (planned)
 │  - two map backends: hmap (<1.24), swiss (≥1.24) │
 └─────────────────────────────────────────────┘
 ```
@@ -75,9 +173,29 @@ See [ADR-01](https://github.com/lkmavi/saferefl/discussions/3) for the full anal
 
 > Run `./scripts/bench.sh` to regenerate. Full results: [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
 
+Numbers above are for the spike benchmarks (Layer 2 cached-offset path). Layer 1 `Get[T]`/`Set[T]` benchmarks are in `benchmarks/layer1_bench_test.go`.
+
 ## Status
 
-Work in progress. See the [implementation plan](_local/IMPL-PLAN-01.md).
+| Layer | Status | Description |
+|---|---|---|
+| Layer 2 — TypeInfo Cache | ✅ Done | `internal/typeinfo`: struct metadata, offset cache, field access via `reflect.NewAt` |
+| Layer 1 — Generics API | ✅ Done | `Get[T]`, `Set[T]`, `MustGet[T]`, `MustSet[T]`, dot-path, `FieldByName[T]`, `Fields`, `FieldsOf[T]` |
+| Layer 3 — Unsafe Accelerator | 🔲 Planned | opt-in `unsafe_accel` build tag, self-test at init, hmap/Swiss Tables backends |
+
+## Examples
+
+Runnable examples are in [`examples/`](examples/):
+
+- [`examples/basic/`](examples/basic/) — Get/Set primitive fields
+- [`examples/dotpath/`](examples/dotpath/) — dot-path traversal through nested structs
+- [`examples/fields/`](examples/fields/) — field inspection without an instance
+
+```
+go run ./examples/basic/
+go run ./examples/dotpath/
+go run ./examples/fields/
+```
 
 ## Go version support
 
