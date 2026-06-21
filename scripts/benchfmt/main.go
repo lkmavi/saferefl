@@ -101,9 +101,9 @@ func parseBenchOutput(r io.Reader) (benchEnv, []group) {
 
 	// Build ordered groups
 	var (
-		groupOrder []string
-		groupSet   = map[string]bool{}
-		groupVars  = map[string][]string{}
+		groupOrder  []string
+		groupSet    = map[string]bool{}
+		groupVars   = map[string][]string{}
 		groupVarSet = map[string]map[string]bool{}
 	)
 	for _, k := range keyOrder {
