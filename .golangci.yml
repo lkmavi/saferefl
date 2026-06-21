@@ -125,11 +125,17 @@ linters:
           - funlen   # layout parsers can be verbose
 
       # TypeInfo cache — reflect-heavy, inherently complex
-      - path: internal/cache/.*\.go
+      - path: internal/typeinfo/.*\.go
         linters:
           - gocognit
           - cyclop
           - gocyclo
+          - nestif
+
+      # TypeInfo access layer — unsafe.Pointer arithmetic is intentional and reflect-verified
+      - path: internal/typeinfo/access\.go
+        linters:
+          - gosec
 
 issues:
   max-issues-per-linter: 0
