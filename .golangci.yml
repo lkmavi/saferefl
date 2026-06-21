@@ -1,0 +1,137 @@
+# GolangCI-Lint v2 Configuration for saferefl
+# Documentation: https://golangci-lint.run/docs/configuration/
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    # Bug detection
+    - govet
+    - staticcheck
+    - errcheck
+    - errorlint
+    - gosec
+    - nilnil
+    - nilerr
+    - ineffassign
+
+    # Code quality
+    - gocyclo
+    - gocognit
+    - funlen
+    - maintidx
+    - cyclop
+    - nestif
+
+    # Style
+    - misspell
+    - whitespace
+    - unconvert
+    - unparam
+    - errname
+    - revive
+
+    # Performance
+    - prealloc
+    - makezero
+
+    # Practices
+    - goconst
+    - gocritic
+    - nolintlint
+    - nakedret
+    - dupl
+    - durationcheck
+
+  settings:
+    govet:
+      enable:
+        - copylocks
+      disable:
+        - fieldalignment  # intentionally managed manually in unsafe layer
+
+    gocyclo:
+      min-complexity: 20
+
+    cyclop:
+      max-complexity: 20
+
+    funlen:
+      lines: 120
+      statements: 60
+
+    gocognit:
+      min-complexity: 30
+
+    misspell:
+      locale: US
+
+    nestif:
+      min-complexity: 4
+
+    revive:
+      rules:
+        - name: var-naming
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - commentFormatting
+        - whyNoLint
+        - unnamedResult
+        - commentedOutCode
+        - paramTypeCombine
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - cyclop
+          - funlen
+          - maintidx
+          - errcheck
+          - gosec
+          - goconst
+          - dupl
+          - gocognit
+
+      # unsafe accelerator layer — unsafe is intentional and self-tested
+      - path: internal/unsafelayout/.*\.go
+        linters:
+          - gosec    # unsafe.Pointer usage is intentional with documented invariants
+          - funlen   # layout parsers can be verbose
+
+      # TypeInfo cache — reflect-heavy, inherently complex
+      - path: internal/cache/.*\.go
+        linters:
+          - gocognit
+          - cyclop
+          - gocyclo
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false

@@ -1,0 +1,28 @@
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 1%
+    patch:
+      default:
+        target: 70%
+        threshold: 1%
+
+ignore:
+  - "examples/"
+  - "_local/"
+
+parsers:
+  go:
+    partials_as_hits: false
+
+comment:
+  layout: "header, diff, flags, components"
+  behavior: default
+  require_changes: false

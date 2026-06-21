@@ -1,0 +1,151 @@
+name: CI
+
+# CI strategy (per ADR-01):
+# - Go version matrix: 1.22 (floor), 1.23, 1.24, stable
+# - Go tip runs as non-blocking to catch future breaking changes early
+# - Tests run with race detector and all build-tag combinations
+# - Build tags tested: default (safe), unsafe_accel, reflectx_strict
+# - Coverage uploaded to Codecov from latest stable on ubuntu only
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write  # Required for Codecov OIDC
+
+env:
+  CGO_ENABLED: "1"  # required for -race on standard Go toolchain
+
+jobs:
+  build:
+    name: Build (${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.22.x', '1.23.x', '1.24.x', 'stable']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - run: go mod download
+      - run: go mod verify
+      - run: go build ./...
+      - run: go build -tags unsafe_accel ./...
+      - run: go build -tags reflectx_strict ./...
+
+  build-tip:
+    name: Build (go tip) [non-blocking]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gotip
+        run: |
+          go install golang.org/dl/gotip@latest
+          gotip download
+        env:
+          GOPATH: /home/runner/go
+
+      - name: Build with gotip
+        run: |
+          export PATH="/home/runner/go/bin:$PATH"
+          gotip build ./...
+          gotip build -tags unsafe_accel ./...
+
+  test:
+    name: Test (${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ['1.22.x', '1.23.x', '1.24.x', 'stable']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - run: go mod download
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go vet (unsafe_accel)
+        run: go vet -tags unsafe_accel ./...
+
+      - name: Tests with race detector
+        run: go test -race -count=1 ./...
+
+      - name: Tests with race detector (unsafe_accel)
+        run: go test -race -count=1 -tags unsafe_accel ./...
+
+      - name: Tests strict mode (no unsafe layer in binary)
+        run: go test -race -count=1 -tags reflectx_strict ./...
+
+      - name: Generate coverage (stable, for codecov)
+        if: matrix.go-version == 'stable'
+        run: go test -race -count=1 -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        if: matrix.go-version == 'stable'
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: ./coverage.txt
+          flags: unittests
+          name: codecov-saferefl
+          fail_ci_if_error: true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
+          args: --timeout=5m
+
+  formatting:
+    name: Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Unformatted files:"
+            gofmt -l .
+            echo "Run 'go fmt ./...' to fix."
+            exit 1
+          fi
