@@ -52,16 +52,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install gotip
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install and download gotip
         run: |
           go install golang.org/dl/gotip@latest
           gotip download
-        env:
-          GOPATH: /home/runner/go
 
       - name: Build with gotip
         run: |
-          export PATH="/home/runner/go/bin:$PATH"
           gotip build ./...
           gotip build -tags unsafe_accel ./...
 
