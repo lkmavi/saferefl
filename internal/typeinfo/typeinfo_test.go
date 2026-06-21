@@ -213,6 +213,65 @@ func TestSetField_typeMismatchReturnsError(t *testing.T) {
 	}
 }
 
+// --- addTagEntries edge-case tests ---
+
+// dashTagStruct covers the `name == "-"` branch: entry must be skipped.
+type dashTagStruct struct {
+	Name string `json:"-"`
+}
+
+// emptyNameTagStruct covers the `name == ""` branch: `json:",omitempty"` has no name.
+type emptyNameTagStruct struct {
+	Name string `json:",omitempty"`
+}
+
+func TestAddTagEntries_dashNameSkipped(t *testing.T) {
+	desc := buildDescriptor(reflect.TypeOf(dashTagStruct{}))
+	if _, ok := desc.FieldsByTag["json"]["-"]; ok {
+		t.Error(`FieldsByTag must not contain "-" name entries`)
+	}
+	if len(desc.FieldsByTag["json"]) != 0 {
+		t.Errorf("expected empty json tag map, got %v", desc.FieldsByTag["json"])
+	}
+}
+
+func TestAddTagEntries_emptyNameSkipped(t *testing.T) {
+	desc := buildDescriptor(reflect.TypeOf(emptyNameTagStruct{}))
+	if _, ok := desc.FieldsByTag["json"][""]; ok {
+		t.Error(`FieldsByTag must not contain empty-name entries`)
+	}
+}
+
+func TestAddTagEntries_whitespaceOnlyTag(t *testing.T) {
+	// Covers the `if s == "" { break }` branch after whitespace stripping.
+	desc := &TypeDescriptor{FieldsByTag: make(map[string]map[string]*FieldMeta)}
+	fm := &FieldMeta{Name: "X", Tag: reflect.StructTag("   ")}
+	addTagEntries(desc, fm) // must not panic
+	if len(desc.FieldsByTag) != 0 {
+		t.Error("whitespace-only tag should produce no entries")
+	}
+}
+
+func TestAddTagEntries_malformedTag(t *testing.T) {
+	// Covers the `if i == 0 || i+1 >= len(s) || ...` break (no colon+quote pair).
+	desc := &TypeDescriptor{FieldsByTag: make(map[string]map[string]*FieldMeta)}
+	fm := &FieldMeta{Name: "X", Tag: reflect.StructTag("not-a-valid-tag")}
+	addTagEntries(desc, fm) // must not panic
+	if len(desc.FieldsByTag) != 0 {
+		t.Error("malformed tag should produce no entries")
+	}
+}
+
+func TestAddTagEntries_unclosedQuote(t *testing.T) {
+	// Covers the `if end < 0 { break }` branch (closing quote is missing).
+	desc := &TypeDescriptor{FieldsByTag: make(map[string]map[string]*FieldMeta)}
+	fm := &FieldMeta{Name: "X", Tag: reflect.StructTag(`json:"unclosed`)}
+	addTagEntries(desc, fm) // must not panic
+	if _, ok := desc.FieldsByTag["json"]; ok {
+		t.Error("unclosed-quote tag should produce no entries")
+	}
+}
+
 // --- helpers ---
 
 func mustField(t reflect.Type, name string) reflect.StructField {

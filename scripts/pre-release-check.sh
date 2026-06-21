@@ -78,9 +78,9 @@ fi
 echo ""
 
 # 5. Build — default, unsafe_accel, reflectx_strict
+# saferefl is a library (no main packages), so go build ./... compiles without producing output.
 log_info "Building (default)..."
-BUILD_TMP=$(mktemp -d)
-if go build -o "$BUILD_TMP" ./... 2>&1; then
+if go build ./... 2>&1; then
     log_success "Build OK (default)"
 else
     log_error "Build failed (default)"
@@ -88,7 +88,7 @@ else
 fi
 
 log_info "Building (-tags unsafe_accel)..."
-if go build -tags unsafe_accel -o "$BUILD_TMP" ./... 2>&1; then
+if go build -tags unsafe_accel ./... 2>&1; then
     log_success "Build OK (unsafe_accel)"
 else
     log_error "Build failed (unsafe_accel)"
@@ -96,13 +96,12 @@ else
 fi
 
 log_info "Building (-tags reflectx_strict)..."
-if go build -tags reflectx_strict -o "$BUILD_TMP" ./... 2>&1; then
+if go build -tags reflectx_strict ./... 2>&1; then
     log_success "Build OK (reflectx_strict)"
 else
     log_error "Build failed (reflectx_strict)"
     ERRORS=$((ERRORS + 1))
 fi
-rm -rf "$BUILD_TMP"
 echo ""
 
 # 6. go.mod
@@ -153,10 +152,10 @@ if [ "$QUICK" -eq 0 ]; then
     COVERAGE=$(echo "$COV_OUT" | grep "coverage:" | awk -F'coverage: ' '{print $2}' | awk '{print $1}' | sed 's/%//' | tail -1)
     if [ -n "$COVERAGE" ]; then
         echo "  overall: ${COVERAGE}%"
-        if awk -v cov="$COVERAGE" 'BEGIN {exit !(cov >= 70.0)}'; then
-            log_success "Coverage >= 70%"
+        if awk -v cov="$COVERAGE" 'BEGIN {exit !(cov >= 85.0)}'; then
+            log_success "Coverage >= 85%"
         else
-            log_warning "Coverage below 70% (${COVERAGE}%)"
+            log_warning "Coverage below 85% (${COVERAGE}%)"
             WARNINGS=$((WARNINGS + 1))
         fi
     else
