@@ -32,9 +32,9 @@ var productFieldNames = []string{
 
 // pre-computed reflect2 field descriptors — built once at startup, like a real codec.
 var (
-	productType2    = reflect2.TypeOf(Product{}).(reflect2.StructType)
-	productFields2  = buildProductFields2()
-	productOffsets  = buildProductOffsets()
+	productType2   = reflect2.TypeOf(Product{}).(reflect2.StructType)
+	productFields2 = buildProductFields2()
+	productOffsets = buildProductOffsets()
 )
 
 func buildProductFields2() []reflect2.StructField {

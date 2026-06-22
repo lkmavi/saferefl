@@ -34,9 +34,9 @@ var (
 
 // pre-compiled reflect2 field descriptors and source offsets — built once at query-prepare time.
 var (
-	ormType2    = reflect2.TypeOf(ORMRow{}).(reflect2.StructType)
-	ormFields2  = buildORMFields2()
-	ormSrcOff   = buildORMSrcOff()
+	ormType2   = reflect2.TypeOf(ORMRow{}).(reflect2.StructType)
+	ormFields2 = buildORMFields2()
+	ormSrcOff  = buildORMSrcOff()
 )
 
 func buildORMFields2() []reflect2.StructField {
