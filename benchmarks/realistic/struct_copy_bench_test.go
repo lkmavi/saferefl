@@ -10,6 +10,21 @@ import (
 
 var sinkDst UserDst
 
+// pre-bound Accessor pairs for the hot-path Accessor variant.
+var (
+	srcIDAccSC    = mustMakeAccessor[int](&UserSrc{}, "ID")
+	srcNameAccSC  = mustMakeAccessor[string](&UserSrc{}, "Name")
+	srcEmailAccSC = mustMakeAccessor[string](&UserSrc{}, "Email")
+	srcScoreAccSC = mustMakeAccessor[float64](&UserSrc{}, "Score")
+	srcActAccSC   = mustMakeAccessor[bool](&UserSrc{}, "Active")
+
+	dstIDAccSC    = mustMakeAccessor[int](&UserDst{}, "ID")
+	dstNameAccSC  = mustMakeAccessor[string](&UserDst{}, "Name")
+	dstEmailAccSC = mustMakeAccessor[string](&UserDst{}, "Email")
+	dstScoreAccSC = mustMakeAccessor[float64](&UserDst{}, "Score")
+	dstActAccSC   = mustMakeAccessor[bool](&UserDst{}, "Active")
+)
+
 // BenchmarkStructCopy_Manual — direct struct literal assignment, the native baseline.
 func BenchmarkStructCopy_Manual(b *testing.B) {
 	src := newUserSrc()
@@ -52,6 +67,24 @@ func BenchmarkStructCopy_Reflect(b *testing.B) {
 			dstV.Field(i).Set(srcV.Field(i))
 		}
 		sinkDst = dst
+	}
+}
+
+// BenchmarkStructCopy_Accessor — Layer 3: pre-bound Accessor pairs, direct arithmetic.
+// Simulates a real copy pipeline where bindings are resolved once at startup.
+func BenchmarkStructCopy_Accessor(b *testing.B) {
+	src := newUserSrc()
+	dst := &UserDst{}
+	srcPtr := saferefl.UnsafePtrOf(&src)
+	dstPtr := saferefl.UnsafePtrOf(dst)
+	b.ResetTimer()
+	for range b.N {
+		dstIDAccSC.Set(dstPtr, srcIDAccSC.Get(srcPtr))
+		dstNameAccSC.Set(dstPtr, srcNameAccSC.Get(srcPtr))
+		dstEmailAccSC.Set(dstPtr, srcEmailAccSC.Get(srcPtr))
+		dstScoreAccSC.Set(dstPtr, srcScoreAccSC.Get(srcPtr))
+		dstActAccSC.Set(dstPtr, srcActAccSC.Get(srcPtr))
+		sinkDst = *dst
 	}
 }
 

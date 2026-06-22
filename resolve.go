@@ -66,7 +66,7 @@ func resolvePath(objPtr unsafe.Pointer, structType reflect.Type, fieldPath strin
 			}
 		}
 
-		fieldPtr := typeinfo.GetFieldPtr(currentPtr, fm)
+		fieldPtr := typeinfo.GetFieldFast(currentPtr, fm)
 
 		if !hasMore {
 			return fieldPtr, fm, nil

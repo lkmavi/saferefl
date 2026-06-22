@@ -16,6 +16,20 @@ var columns = []string{
 	"Col6", "Col7", "Col8", "Col9", "Col10",
 }
 
+// pre-bound Accessor per column — resolved at statement-prepare time, like a real ORM.
+var (
+	ormCol1  = mustMakeAccessor[int64](&ORMRow{}, "Col1")
+	ormCol2  = mustMakeAccessor[string](&ORMRow{}, "Col2")
+	ormCol3  = mustMakeAccessor[string](&ORMRow{}, "Col3")
+	ormCol4  = mustMakeAccessor[float64](&ORMRow{}, "Col4")
+	ormCol5  = mustMakeAccessor[int64](&ORMRow{}, "Col5")
+	ormCol6  = mustMakeAccessor[bool](&ORMRow{}, "Col6")
+	ormCol7  = mustMakeAccessor[string](&ORMRow{}, "Col7")
+	ormCol8  = mustMakeAccessor[float64](&ORMRow{}, "Col8")
+	ormCol9  = mustMakeAccessor[int64](&ORMRow{}, "Col9")
+	ormCol10 = mustMakeAccessor[string](&ORMRow{}, "Col10")
+)
+
 // pre-parsed row values (simulates sql.Rows.Scan having already decoded the wire data).
 var rowValues = newORMValues()
 
@@ -61,6 +75,28 @@ func BenchmarkORMScan_Saferefl(b *testing.B) {
 		_ = saferefl.Set[float64](row, "Col8", vals[7].(float64))
 		_ = saferefl.Set[int64](row, "Col9", vals[8].(int64))
 		_ = saferefl.Set[string](row, "Col10", vals[9].(string))
+		sinkRow = *row
+	}
+}
+
+// BenchmarkORMScan_Accessor — Layer 3: pre-bound Accessor per column.
+// Simulates real ORM: prepare bindings once per statement, scan every row in the hot loop.
+func BenchmarkORMScan_Accessor(b *testing.B) {
+	row := &ORMRow{}
+	ptr := saferefl.UnsafePtrOf(row)
+	vals := rowValues
+	b.ResetTimer()
+	for range b.N {
+		ormCol1.Set(ptr, vals[0].(int64))
+		ormCol2.Set(ptr, vals[1].(string))
+		ormCol3.Set(ptr, vals[2].(string))
+		ormCol4.Set(ptr, vals[3].(float64))
+		ormCol5.Set(ptr, vals[4].(int64))
+		ormCol6.Set(ptr, vals[5].(bool))
+		ormCol7.Set(ptr, vals[6].(string))
+		ormCol8.Set(ptr, vals[7].(float64))
+		ormCol9.Set(ptr, vals[8].(int64))
+		ormCol10.Set(ptr, vals[9].(string))
 		sinkRow = *row
 	}
 }

@@ -23,6 +23,13 @@ var registryValues = map[string]reflect.Value{
 	"C": reflect.ValueOf(registry["C"]),
 }
 
+// pre-bound Accessor bindings — resolved once at startup like a real DI container.
+var (
+	svcAAcc = mustMakeAccessor[*ServiceA](&AppServices{}, "A")
+	svcBAcc = mustMakeAccessor[*ServiceB](&AppServices{}, "B")
+	svcCAcc = mustMakeAccessor[*ServiceC](&AppServices{}, "C")
+)
+
 // BenchmarkDIResolve_Manual — direct pointer assignment, native baseline.
 func BenchmarkDIResolve_Manual(b *testing.B) {
 	a := registry["A"].(*ServiceA)
@@ -45,6 +52,23 @@ func BenchmarkDIResolve_Saferefl(b *testing.B) {
 		_ = saferefl.Set[*ServiceA](svc, "A", a)
 		_ = saferefl.Set[*ServiceB](svc, "B", bc)
 		_ = saferefl.Set[*ServiceC](svc, "C", c)
+		sinkServices = *svc
+	}
+}
+
+// BenchmarkDIResolve_Accessor — Layer 3: pre-bound Accessor, inject per request.
+// Simulates real DI: resolve bindings once at startup, inject on every request.
+func BenchmarkDIResolve_Accessor(b *testing.B) {
+	a := registry["A"].(*ServiceA)
+	bc := registry["B"].(*ServiceB)
+	c := registry["C"].(*ServiceC)
+	svc := &AppServices{}
+	ptr := saferefl.UnsafePtrOf(svc)
+	b.ResetTimer()
+	for range b.N {
+		svcAAcc.Set(ptr, a)
+		svcBAcc.Set(ptr, bc)
+		svcCAcc.Set(ptr, c)
 		sinkServices = *svc
 	}
 }
