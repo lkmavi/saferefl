@@ -13,11 +13,11 @@ BENCHTIME="${2:-1s}"
 
 echo "▶ benchmarks (count=${COUNT}, benchtime=${BENCHTIME})..."
 
-go test ./benchmarks/... \
+(cd benchmarks && go test ./... \
     -bench=. \
     -benchmem \
     -count="${COUNT}" \
-    -benchtime="${BENCHTIME}" \
+    -benchtime="${BENCHTIME}") \
     | go run ./scripts/benchfmt/main.go \
         -output benchmarks/RESULTS.md \
         -readme README.md

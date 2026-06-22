@@ -308,6 +308,98 @@ func TestGet_emptyPath(t *testing.T) {
 	}
 }
 
+// --- Accessor tests ---
+
+func TestMakeAccessor_basic(t *testing.T) {
+	p := &person{Name: "Alice", Age: 30}
+
+	nameAcc, err := saferefl.MakeAccessor[string](p, "Name")
+	if err != nil {
+		t.Fatalf("MakeAccessor Name: %v", err)
+	}
+	if v := nameAcc.Get(saferefl.UnsafePtrOf(p)); v != "Alice" {
+		t.Errorf("Get Name = %q, want Alice", v)
+	}
+	nameAcc.Set(saferefl.UnsafePtrOf(p), "Bob")
+	if p.Name != "Bob" {
+		t.Errorf("after Set, Name = %q, want Bob", p.Name)
+	}
+
+	ageAcc, err := saferefl.MakeAccessor[int](p, "Age")
+	if err != nil {
+		t.Fatalf("MakeAccessor Age: %v", err)
+	}
+	if v := ageAcc.Get(saferefl.UnsafePtrOf(p)); v != 30 {
+		t.Errorf("Get Age = %d, want 30", v)
+	}
+}
+
+func TestMakeAccessor_getFrom_setOn(t *testing.T) {
+	p := &person{Name: "Carol"}
+	acc, _ := saferefl.MakeAccessor[string](p, "Name")
+
+	v, err := acc.GetFrom(p)
+	if err != nil || v != "Carol" {
+		t.Errorf("GetFrom = %q, err=%v", v, err)
+	}
+	if err := acc.SetOn(p, "Dave"); err != nil {
+		t.Fatalf("SetOn: %v", err)
+	}
+	if p.Name != "Dave" {
+		t.Errorf("after SetOn, Name = %q, want Dave", p.Name)
+	}
+}
+
+func TestMakeAccessor_dotpath_value(t *testing.T) {
+	e := &employee{Office: address{City: "Berlin"}}
+	acc, err := saferefl.MakeAccessor[string](e, "Office.City")
+	if err != nil {
+		t.Fatalf("MakeAccessor Office.City: %v", err)
+	}
+	if v := acc.Get(saferefl.UnsafePtrOf(e)); v != "Berlin" {
+		t.Errorf("Get Office.City = %q, want Berlin", v)
+	}
+	acc.Set(saferefl.UnsafePtrOf(e), "Paris")
+	if e.Office.City != "Paris" {
+		t.Errorf("after Set, Office.City = %q, want Paris", e.Office.City)
+	}
+}
+
+func TestMakeAccessor_dotpath_pointer(t *testing.T) {
+	e := &employee{Contact: &address{City: "NYC"}}
+	acc, err := saferefl.MakeAccessor[string](e, "Contact.City")
+	if err != nil {
+		t.Fatalf("MakeAccessor Contact.City: %v", err)
+	}
+	if v := acc.Get(saferefl.UnsafePtrOf(e)); v != "NYC" {
+		t.Errorf("Get Contact.City = %q, want NYC", v)
+	}
+}
+
+func TestMakeAccessor_typeMismatch(t *testing.T) {
+	p := &person{}
+	_, err := saferefl.MakeAccessor[int](p, "Name")
+	if err == nil {
+		t.Fatal("expected TypeMismatchError, got nil")
+	}
+	var tme *saferefl.TypeMismatchError
+	if !errors.As(err, &tme) {
+		t.Errorf("want TypeMismatchError, got %T", err)
+	}
+}
+
+func TestMakeAccessor_fieldNotFound(t *testing.T) {
+	p := &person{}
+	_, err := saferefl.MakeAccessor[string](p, "NoSuchField")
+	if err == nil {
+		t.Fatal("expected FieldNotFoundError, got nil")
+	}
+	var fnf *saferefl.FieldNotFoundError
+	if !errors.As(err, &fnf) {
+		t.Errorf("want FieldNotFoundError, got %T", err)
+	}
+}
+
 // --- Fuzz ---
 
 func FuzzGet(f *testing.F) {
