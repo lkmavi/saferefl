@@ -76,7 +76,7 @@ func selfTestSlice() bool {
 	elemSize := unsafe.Sizeof(int64(0))
 
 	for i, want := range s {
-		got := *(*int64)(UnsafeSliceElemPtr(sliceData, i, uintptr(elemSize)))
+		got := *(*int64)(UnsafeSliceElemPtr(sliceData, i, elemSize))
 		if got != want {
 			return false
 		}

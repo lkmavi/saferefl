@@ -6,14 +6,14 @@ import (
 	"testing"
 	"unsafe"
 
-	reflect2 "github.com/modern-go/reflect2"
 	"github.com/lkmavi/saferefl"
+	reflect2 "github.com/modern-go/reflect2"
 )
 
 var (
-	sinkProduct  Product
-	sinkInt64    int64
-	jsonPayload  []byte
+	sinkProduct Product
+	sinkInt64   int64
+	jsonPayload []byte
 )
 
 func init() {

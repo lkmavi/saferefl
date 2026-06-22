@@ -65,7 +65,7 @@ func TestUnsafeSliceElemPtr_roundtrip(t *testing.T) {
 	size := unsafe.Sizeof(int32(0))
 
 	for i, want := range s {
-		ptr := UnsafeSliceElemPtr(sliceData, i, uintptr(size))
+		ptr := UnsafeSliceElemPtr(sliceData, i, size)
 		got := *(*int32)(ptr)
 		if got != want {
 			t.Errorf("index %d: got %d, want %d", i, got, want)

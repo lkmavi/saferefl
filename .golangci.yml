@@ -142,6 +142,16 @@ linters:
         linters:
           - gosec
 
+      # Accessor and Layer 3 — unsafe is intentional; layout verified by self-test at init
+      - path: (accessor|layer3.*)\.go
+        linters:
+          - gosec
+
+      # debug package — unsafe.Slice is safe: pointer and length come from reflect
+      - path: debug/.*\.go
+        linters:
+          - gosec
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

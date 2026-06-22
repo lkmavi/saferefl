@@ -120,6 +120,6 @@ func BenchmarkGet_int_Direct(b *testing.B) {
 	const idOffset = unsafe.Offsetof(benchUser{}.ID)
 	b.ResetTimer()
 	for i := range b.N {
-		sinkInt = *(*int)(unsafe.Pointer(uintptr(ptr)+idOffset)) + i
+		sinkInt = *(*int)(unsafe.Pointer(uintptr(ptr) + idOffset)) + i
 	}
 }

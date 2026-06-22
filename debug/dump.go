@@ -16,6 +16,20 @@ import (
 
 const bytesPerRow = 16
 
+// errWriter wraps an io.Writer and stops writing on the first error,
+// returning it at the end. This keeps StructDump free of per-call error checks.
+type errWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (ew *errWriter) printf(format string, args ...any) {
+	if ew.err != nil {
+		return
+	}
+	_, ew.err = fmt.Fprintf(ew.w, format, args...)
+}
+
 // StructDump writes an annotated hex dump of obj's memory to w.
 // Each row shows the byte offset, hex values, ASCII representation, and the
 // name+type of the struct field that starts at that offset.
@@ -48,9 +62,10 @@ func StructDump(obj any, w io.Writer) error {
 	// Build offset → field name map for annotation.
 	fieldAt := buildFieldAt(desc)
 
-	fmt.Fprintf(w, "%s (%d bytes)\n", rt.Name(), size)
-	fmt.Fprintf(w, "%-6s  %-47s  │  %-16s  %s\n", "offset", "hex", "ascii", "field")
-	fmt.Fprintf(w, "%s\n", strings.Repeat("─", 85))
+	ew := &errWriter{w: w}
+	ew.printf("%s (%d bytes)\n", rt.Name(), size)
+	ew.printf("%-6s  %-47s  │  %-16s  %s\n", "offset", "hex", "ascii", "field")
+	ew.printf("%s\n", strings.Repeat("─", 85))
 
 	for row := 0; row*bytesPerRow < size; row++ {
 		start := row * bytesPerRow
@@ -60,7 +75,6 @@ func StructDump(obj any, w io.Writer) error {
 		}
 		chunk := rawMem[start:end]
 
-		// Hex column.
 		var hexBuf strings.Builder
 		for i, b := range chunk {
 			if i > 0 {
@@ -89,16 +103,10 @@ func StructDump(obj any, w io.Writer) error {
 			}
 		}
 
-		fmt.Fprintf(w, "+%04x  %-47s  │  %-16s  %s\n",
+		ew.printf("+%04x  %-47s  │  %-16s  %s\n",
 			start, hexBuf.String(), asciiBuf.String(), annotation)
 	}
-	return nil
-}
-
-// fieldAnnotation holds the display string for a field at a given offset.
-type fieldAnnotation struct {
-	offset uintptr
-	label  string
+	return ew.err
 }
 
 func buildFieldAt(desc *typeinfo.TypeDescriptor) map[uintptr]string {
