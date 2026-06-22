@@ -111,7 +111,9 @@ jobs:
 
       - name: Generate coverage (stable, for codecov)
         if: matrix.go-version == 'stable'
-        run: go test -race -count=1 -coverprofile=coverage.txt -covermode=atomic ./...
+        run: |
+          go list ./... | grep -v '/examples/' | \
+            xargs go test -race -count=1 -coverprofile=coverage.txt -covermode=atomic
 
       - name: Upload coverage to Codecov
         if: matrix.go-version == 'stable'
