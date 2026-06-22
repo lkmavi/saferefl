@@ -1,10 +1,9 @@
 # Performance Targets
 
 **Baseline date:** 2026-06-22  
-**Status:** pre-Layer 3 (Layer 1 + Layer 2 only)
+**Status:** Layer 3 implemented (all layers shipped)
 
-These targets must be met before the Layer 3 unsafe accelerator is considered production-ready.
-CI enforces them via the `bench-regression` job on every PR.
+These targets define the performance envelope for each layer of the API.
 
 ---
 
@@ -18,7 +17,7 @@ CI enforces them via the `bench-regression` job on every PR.
 
 **Layer 1** is the `Get[T]`/`Set[T]` public API with TypeInfo cache warm.  
 **Layer 2** is the internal `typeinfo.GetFieldPtr` + `reflect.NewAt` path.  
-**Layer 3** is the optional `internal/unsafelayout` accelerator (Phase 4).
+**Layer 3** is the optional `internal/unsafelayout` accelerator (`unsafe_accel` build tag).
 
 ---
 

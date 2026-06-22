@@ -12,12 +12,12 @@ import (
 // sinkIntPtr prevents the compiler from optimising away slice-element reads.
 var sinkIntPtr *int
 
-// ---- FieldRead: all layers compared for a single int field ----
+// ---- FieldRead: layer comparison for a single int field ----
 //
-// Layer2 (ReflectNewAt) = cached offset + reflect.NewAt per read — original design
-// Layer1 (Get)          = saferefl.Get[int] with full path resolution each call
-// Layer3 (Accessor)     = Accessor.Get with pre-extracted unsafe.Pointer
-// Native                = direct struct field access (theoretical minimum)
+// Reflect = stdlib reflect with pre-cached reflect.Value (fastest reflect path)
+// L1      = saferefl.Get[int] — full path resolution per call
+// L3      = Accessor.Get — pre-bound, pointer arithmetic only
+// Native  = direct struct field access (theoretical minimum)
 
 func BenchmarkFieldRead_Reflect(b *testing.B) {
 	u := &benchUser{ID: 42}
@@ -28,18 +28,7 @@ func BenchmarkFieldRead_Reflect(b *testing.B) {
 	}
 }
 
-func BenchmarkFieldRead_ReflectNewAt(b *testing.B) {
-	u := &benchUser{ID: 42}
-	rt := reflect.TypeOf(u.ID)
-	offset := reflect.TypeOf(*u).Field(0).Offset
-	ptr := saferefl.UnsafePtrOf(u)
-	b.ResetTimer()
-	for i := range b.N {
-		sinkInt = int(reflect.NewAt(rt, unsafe.Add(ptr, offset)).Elem().Int()) + i
-	}
-}
-
-func BenchmarkFieldRead_Get(b *testing.B) {
+func BenchmarkFieldRead_L1(b *testing.B) {
 	u := &benchUser{ID: 42}
 	b.ResetTimer()
 	for i := range b.N {
@@ -48,7 +37,20 @@ func BenchmarkFieldRead_Get(b *testing.B) {
 	}
 }
 
-func BenchmarkFieldRead_Accessor(b *testing.B) {
+func BenchmarkFieldRead_L2(b *testing.B) {
+	u := &benchUser{ID: 42}
+	rt := reflect.TypeOf(benchUser{})
+	f, _ := rt.FieldByName("ID")
+	offset := f.Offset
+	rtype := f.Type
+	ptr := unsafe.Pointer(u)
+	b.ResetTimer()
+	for i := range b.N {
+		sinkInt = int(reflect.NewAt(rtype, unsafe.Pointer(uintptr(ptr)+offset)).Elem().Int()) + i
+	}
+}
+
+func BenchmarkFieldRead_L3(b *testing.B) {
 	u := &benchUser{ID: 42}
 	ptr := saferefl.UnsafePtrOf(u)
 	b.ResetTimer()
@@ -67,7 +69,7 @@ func BenchmarkFieldRead_Native(b *testing.B) {
 
 // ---- SliceAt: Layer 3 vs direct vs reflect ----
 
-func BenchmarkSliceAt_Layer3(b *testing.B) {
+func BenchmarkSliceAt_L3(b *testing.B) {
 	s := make([]int, 1000)
 	for i := range s {
 		s[i] = i
@@ -112,7 +114,7 @@ func newBenchMap() map[string]int {
 	return m
 }
 
-func BenchmarkMapLen_Layer3(b *testing.B) {
+func BenchmarkMapLen_L3(b *testing.B) {
 	m := newBenchMap()
 	_ = saferefl.EnableAccel()
 	b.ResetTimer()

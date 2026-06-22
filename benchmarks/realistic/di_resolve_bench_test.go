@@ -3,8 +3,10 @@ package realistic
 import (
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/lkmavi/saferefl"
+	reflect2 "github.com/modern-go/reflect2"
 )
 
 var sinkServices AppServices
@@ -22,6 +24,14 @@ var registryValues = map[string]reflect.Value{
 	"B": reflect.ValueOf(registry["B"]),
 	"C": reflect.ValueOf(registry["C"]),
 }
+
+// pre-compiled reflect2 field descriptors — resolved once at startup, like a real DI container.
+var (
+	diType2 = reflect2.TypeOf(AppServices{}).(reflect2.StructType)
+	diAAcc2 = diType2.FieldByName("A")
+	diBAcc2 = diType2.FieldByName("B")
+	diCAcc2 = diType2.FieldByName("C")
+)
 
 // pre-bound Accessor bindings — resolved once at startup like a real DI container.
 var (
@@ -41,8 +51,8 @@ func BenchmarkDIResolve_Manual(b *testing.B) {
 	}
 }
 
-// BenchmarkDIResolve_Saferefl — Layer 1: Set[*ServiceX] per dependency.
-func BenchmarkDIResolve_Saferefl(b *testing.B) {
+// BenchmarkDIResolve_L1 — Layer 1: Set[*ServiceX] per dependency.
+func BenchmarkDIResolve_L1(b *testing.B) {
 	a := registry["A"].(*ServiceA)
 	bc := registry["B"].(*ServiceB)
 	c := registry["C"].(*ServiceC)
@@ -56,9 +66,9 @@ func BenchmarkDIResolve_Saferefl(b *testing.B) {
 	}
 }
 
-// BenchmarkDIResolve_Accessor — Layer 3: pre-bound Accessor, inject per request.
+// BenchmarkDIResolve_L3 — Layer 3: pre-bound Accessor, inject per request.
 // Simulates real DI: resolve bindings once at startup, inject on every request.
-func BenchmarkDIResolve_Accessor(b *testing.B) {
+func BenchmarkDIResolve_L3(b *testing.B) {
 	a := registry["A"].(*ServiceA)
 	bc := registry["B"].(*ServiceB)
 	c := registry["C"].(*ServiceC)
@@ -69,6 +79,23 @@ func BenchmarkDIResolve_Accessor(b *testing.B) {
 		svcAAcc.Set(ptr, a)
 		svcBAcc.Set(ptr, bc)
 		svcCAcc.Set(ptr, c)
+		sinkServices = *svc
+	}
+}
+
+// BenchmarkDIResolve_Reflect2 — reflect2: pre-compiled field descriptors + UnsafeSet.
+// Represents a well-optimised DI container that caches reflect2 metadata at startup.
+func BenchmarkDIResolve_Reflect2(b *testing.B) {
+	a := registry["A"].(*ServiceA)
+	bc := registry["B"].(*ServiceB)
+	c := registry["C"].(*ServiceC)
+	svc := &AppServices{}
+	ptr := unsafe.Pointer(svc)
+	b.ResetTimer()
+	for range b.N {
+		diAAcc2.UnsafeSet(ptr, unsafe.Pointer(&a))
+		diBAcc2.UnsafeSet(ptr, unsafe.Pointer(&bc))
+		diCAcc2.UnsafeSet(ptr, unsafe.Pointer(&c))
 		sinkServices = *svc
 	}
 }

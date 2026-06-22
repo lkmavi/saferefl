@@ -1,6 +1,9 @@
 package saferefl
 
-import "reflect"
+import (
+	"reflect"
+	"unsafe"
+)
 
 // Set sets the value of fieldPath on obj to val.
 // fieldPath supports dot-separated paths (e.g. "Address.City").
@@ -31,16 +34,33 @@ func Set[T any](obj any, fieldPath string, val T) error {
 		}
 	}
 
-	// Fast path: identical types — zero-copy direct write.
+	// Fast path: identical types — direct write, zero allocations.
 	// Safety: ptr was obtained via reflect-verified offset arithmetic on a live object.
 	if fm.Type == wantType {
 		*(*T)(ptr) = val
 		return nil
 	}
-	// Slow path: T is a concrete type assignable to an interface field.
-	// reflect.ValueOf(&val).Elem() is safe even for nil interface values.
-	reflect.NewAt(fm.Type, ptr).Elem().Set(reflect.ValueOf(&val).Elem())
+
+	// Slow path: T is a concrete type assignable to an interface-typed field
+	// (e.g. Set[*os.File](obj, "reader", f) where the field type is io.Reader).
+	// Isolated into a noinline function so that taking &val there does NOT
+	// cause val to escape to the heap in this (fast-path) function.
+	setSlowPath(ptr, fm.Type, wantType, val)
 	return nil
+}
+
+// setSlowPath writes a concrete value of type T into a field whose runtime type
+// is an interface that T implements.
+//
+// The //go:noinline directive is load-bearing: it prevents escape analysis from
+// seeing &val here and marking val as heap-escaping in the calling Set[T] function,
+// keeping the common fast path at zero allocations.
+//
+//go:noinline
+func setSlowPath[T any](fieldPtr unsafe.Pointer, dstType, srcType reflect.Type, val T) {
+	reflect.NewAt(dstType, fieldPtr).Elem().Set(
+		reflect.NewAt(srcType, unsafe.Pointer(&val)).Elem(),
+	)
 }
 
 // MustSet is like [Set] but panics on any error.
