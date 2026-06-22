@@ -5,7 +5,7 @@ name: CI
 # - Go tip runs as non-blocking to catch future breaking changes early
 # - Tests run with race detector and all build-tag combinations
 # - Build tags tested: default (safe), unsafe_accel, reflectx_strict
-# - Coverage uploaded to Codecov from latest stable on ubuntu only
+# - Coverage: stable uploads default+reflectx_strict profiles; 1.22 uploads legacy hmap profile
 
 on:
   push:
@@ -109,20 +109,45 @@ jobs:
       - name: Tests strict mode (no unsafe layer in binary)
         run: go test -race -count=1 -tags reflectx_strict ./...
 
-      - name: Generate coverage (stable, for codecov)
+      # Coverage: stable uploads default + reflectx_strict profiles.
+      # Go 1.22 uploads the legacy hmap profile — layer3_map_legacy.go is only
+      # compiled on Go < 1.24, so we need that job for full patch coverage.
+      - name: Coverage - default tags (stable)
         if: matrix.go-version == 'stable'
         run: |
           go list ./... | grep -v '/examples/' | \
-            xargs go test -race -count=1 -coverprofile=coverage.txt -covermode=atomic
+            xargs go test -race -count=1 -coverprofile=coverage-default.txt -covermode=atomic
 
-      - name: Upload coverage to Codecov
+      - name: Coverage - reflectx_strict (stable)
+        if: matrix.go-version == 'stable'
+        run: |
+          go list ./... | grep -v '/examples/' | \
+            xargs go test -race -count=1 -tags reflectx_strict -coverprofile=coverage-strict.txt -covermode=atomic
+
+      - name: Coverage - legacy hmap backend (1.22)
+        if: matrix.go-version == '1.22.x'
+        run: |
+          go list ./... | grep -v '/examples/' | \
+            xargs go test -race -count=1 -coverprofile=coverage-legacy.txt -covermode=atomic
+
+      - name: Upload coverage to Codecov (stable)
         if: matrix.go-version == 'stable'
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: ./coverage.txt
-          flags: unittests
-          name: codecov-saferefl
+          files: ./coverage-default.txt,./coverage-strict.txt
+          flags: stable
+          name: codecov-saferefl-stable
+          fail_ci_if_error: true
+
+      - name: Upload coverage to Codecov (1.22, legacy hmap backend)
+        if: matrix.go-version == '1.22.x'
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: ./coverage-legacy.txt
+          flags: go122
+          name: codecov-saferefl-go122
           fail_ci_if_error: true
 
   lint:

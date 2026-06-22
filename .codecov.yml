@@ -3,6 +3,17 @@ coverage:
     project:
       default:
         target: 85%
+    patch:
+      default:
+        target: 85%
+
+flags:
+  stable:
+    carryforward: false
+  go122:
+    # Carry forward when the 1.22 matrix job is absent so a missing upload
+    # does not drop coverage for layer3_map_legacy.go unexpectedly.
+    carryforward: true
 
 ignore:
   - "examples/"
