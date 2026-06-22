@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"unsafe"
+
+	"github.com/lkmavi/saferefl/internal/unsafelayout"
 )
 
 // GetFieldPtr returns a pointer to the field within the struct pointed to by objPtr.
@@ -11,6 +13,17 @@ import (
 // by the unsafe.Pointer conversion rules.
 func GetFieldPtr(objPtr unsafe.Pointer, f *FieldMeta) unsafe.Pointer {
 	return unsafe.Pointer(uintptr(objPtr) + f.Offset)
+}
+
+// GetFieldFast is the Layer 3 hot path: uses the unsafelayout accelerator when
+// available, falling back to GetFieldPtr otherwise.
+// Both paths are semantically identical; the accelerator path routes through
+// the self-tested unsafelayout package for reflectx_strict build-tag awareness.
+func GetFieldFast(objPtr unsafe.Pointer, f *FieldMeta) unsafe.Pointer {
+	if unsafelayout.AccelAvailable() {
+		return unsafelayout.UnsafeFieldPtr(objPtr, f.Offset)
+	}
+	return GetFieldPtr(objPtr, f)
 }
 
 // SetField sets the field value using reflect.NewAt — the documented safe path for

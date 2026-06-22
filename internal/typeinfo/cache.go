@@ -5,11 +5,12 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type cacheEntry struct {
 	once sync.Once
-	desc *TypeDescriptor
+	desc atomic.Pointer[TypeDescriptor]
 }
 
 var globalCache sync.Map // reflect.Type → *cacheEntry
@@ -25,12 +26,22 @@ func TypeDescriptorOf(t reflect.Type) *TypeDescriptor {
 	if t.Kind() != reflect.Struct {
 		panic(fmt.Sprintf("saferefl: TypeDescriptorOf requires struct type, got %v", t.Kind()))
 	}
-	v, _ := globalCache.LoadOrStore(t, &cacheEntry{})
+	// Fast path: type already cached — single atomic load, zero allocation.
+	if v, ok := globalCache.Load(t); ok {
+		e := v.(*cacheEntry)
+		if d := e.desc.Load(); d != nil {
+			return d
+		}
+		// Concurrent first build in progress: wait via once.Do.
+		e.once.Do(func() { e.desc.Store(buildDescriptor(t)) })
+		return e.desc.Load()
+	}
+	// Slow path: first time seeing this type — allocate entry and build.
+	entry := &cacheEntry{}
+	v, _ := globalCache.LoadOrStore(t, entry)
 	e := v.(*cacheEntry)
-	e.once.Do(func() {
-		e.desc = buildDescriptor(t)
-	})
-	return e.desc
+	e.once.Do(func() { e.desc.Store(buildDescriptor(t)) })
+	return e.desc.Load()
 }
 
 func buildDescriptor(t reflect.Type) *TypeDescriptor {

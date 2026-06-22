@@ -146,10 +146,13 @@ fi
 echo ""
 
 if [ "$QUICK" -eq 0 ]; then
-    # 8. Coverage
+    # 8. Coverage — use a profile for true aggregate total (excluding examples/).
     log_info "Checking test coverage..."
-    COV_OUT=$(go test -count=1 -cover ./... 2>&1)
-    COVERAGE=$(echo "$COV_OUT" | grep "coverage:" | awk -F'coverage: ' '{print $2}' | awk '{print $1}' | sed 's/%//' | tail -1)
+    COV_PROFILE=$(mktemp /tmp/saferefl-cov-XXXXXX.txt)
+    go list ./... | grep -v '/examples/' | \
+        xargs go test -count=1 -coverprofile="$COV_PROFILE" -covermode=atomic 2>/dev/null
+    COVERAGE=$(go tool cover -func="$COV_PROFILE" | tail -1 | awk '{print $3}' | sed 's/%//')
+    rm -f "$COV_PROFILE"
     if [ -n "$COVERAGE" ]; then
         echo "  overall: ${COVERAGE}%"
         if awk -v cov="$COVERAGE" 'BEGIN {exit !(cov >= 85.0)}'; then
