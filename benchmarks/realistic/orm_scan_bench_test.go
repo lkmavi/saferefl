@@ -3,9 +3,11 @@ package realistic
 import (
 	"reflect"
 	"testing"
+	"unsafe"
 
 	"github.com/jinzhu/copier"
 	"github.com/lkmavi/saferefl"
+	reflect2 "github.com/modern-go/reflect2"
 )
 
 var sinkRow ORMRow
@@ -29,6 +31,31 @@ var (
 	ormCol9  = mustMakeAccessor[int64](&ORMRow{}, "Col9")
 	ormCol10 = mustMakeAccessor[string](&ORMRow{}, "Col10")
 )
+
+// pre-compiled reflect2 field descriptors and source offsets — built once at query-prepare time.
+var (
+	ormType2    = reflect2.TypeOf(ORMRow{}).(reflect2.StructType)
+	ormFields2  = buildORMFields2()
+	ormSrcOff   = buildORMSrcOff()
+)
+
+func buildORMFields2() []reflect2.StructField {
+	fields := make([]reflect2.StructField, len(columns))
+	for i, name := range columns {
+		fields[i] = ormType2.FieldByName(name)
+	}
+	return fields
+}
+
+func buildORMSrcOff() []uintptr {
+	rt := reflect.TypeOf(ORMRow{})
+	off := make([]uintptr, len(columns))
+	for i, name := range columns {
+		f, _ := rt.FieldByName(name)
+		off[i] = f.Offset
+	}
+	return off
+}
 
 // pre-parsed row values (simulates sql.Rows.Scan having already decoded the wire data).
 var rowValues = newORMValues()
@@ -59,8 +86,8 @@ func BenchmarkORMScan_Manual(b *testing.B) {
 	}
 }
 
-// BenchmarkORMScan_Saferefl — Layer 1: Set[T] per column using pre-mapped field names.
-func BenchmarkORMScan_Saferefl(b *testing.B) {
+// BenchmarkORMScan_L1 — Layer 1: Set[T] per column using pre-mapped field names.
+func BenchmarkORMScan_L1(b *testing.B) {
 	row := &ORMRow{}
 	vals := rowValues
 	b.ResetTimer()
@@ -79,9 +106,9 @@ func BenchmarkORMScan_Saferefl(b *testing.B) {
 	}
 }
 
-// BenchmarkORMScan_Accessor — Layer 3: pre-bound Accessor per column.
+// BenchmarkORMScan_L3 — Layer 3: pre-bound Accessor per column.
 // Simulates real ORM: prepare bindings once per statement, scan every row in the hot loop.
-func BenchmarkORMScan_Accessor(b *testing.B) {
+func BenchmarkORMScan_L3(b *testing.B) {
 	row := &ORMRow{}
 	ptr := saferefl.UnsafePtrOf(row)
 	vals := rowValues
@@ -98,6 +125,22 @@ func BenchmarkORMScan_Accessor(b *testing.B) {
 		ormCol9.Set(ptr, vals[8].(int64))
 		ormCol10.Set(ptr, vals[9].(string))
 		sinkRow = *row
+	}
+}
+
+// BenchmarkORMScan_Reflect2 — reflect2: pre-compiled field descriptors + UnsafeSet.
+// Simulates a well-optimised ORM that caches reflect2 metadata at statement-prepare time.
+func BenchmarkORMScan_Reflect2(b *testing.B) {
+	src := rowSrc
+	dst := &ORMRow{}
+	srcPtr := unsafe.Pointer(&src)
+	dstPtr := unsafe.Pointer(dst)
+	b.ResetTimer()
+	for range b.N {
+		for i, f := range ormFields2 {
+			f.UnsafeSet(dstPtr, unsafe.Pointer(uintptr(srcPtr)+ormSrcOff[i]))
+		}
+		sinkRow = *dst
 	}
 }
 

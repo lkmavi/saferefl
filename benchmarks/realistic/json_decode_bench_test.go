@@ -24,40 +24,55 @@ func init() {
 	}
 }
 
-// pre-computed metadata for reflect2 path (simulates codec initialisation).
-var (
-	productType2  = reflect2.TypeOf(Product{}).(reflect2.StructType)
-	productFields = buildProductFields()
-)
-
-type productFieldMeta struct {
-	field2 reflect2.StructField
-	offset uintptr
-	rtype  reflect.Type
+// fieldNames is the ordered list of field names — simulates JSON key mapping built at codec-init time.
+var productFieldNames = []string{
+	"ID", "SKU", "Title", "Description", "Price",
+	"Stock", "Weight", "Active", "Category", "Tags",
 }
 
-func buildProductFields() []productFieldMeta {
-	names := []string{
-		"ID", "SKU", "Title", "Description", "Price",
-		"Stock", "Weight", "Active", "Category", "Tags",
+// pre-computed reflect2 field descriptors — built once at startup, like a real codec.
+var (
+	productType2    = reflect2.TypeOf(Product{}).(reflect2.StructType)
+	productFields2  = buildProductFields2()
+	productOffsets  = buildProductOffsets()
+)
+
+func buildProductFields2() []reflect2.StructField {
+	fields := make([]reflect2.StructField, len(productFieldNames))
+	for i, name := range productFieldNames {
+		fields[i] = productType2.FieldByName(name)
 	}
+	return fields
+}
+
+func buildProductOffsets() []uintptr {
 	rt := reflect.TypeOf(Product{})
-	entries := make([]productFieldMeta, len(names))
-	for i, name := range names {
-		sf, _ := rt.FieldByName(name)
-		entries[i] = productFieldMeta{
-			field2: productType2.FieldByName(name),
-			offset: sf.Offset,
-			rtype:  sf.Type,
-		}
+	offsets := make([]uintptr, len(productFieldNames))
+	for i, name := range productFieldNames {
+		f, _ := rt.FieldByName(name)
+		offsets[i] = f.Offset
 	}
-	return entries
+	return offsets
 }
 
 // pre-parsed source values matching newProduct().
 var productSrc = newProduct()
 
-// BenchmarkJSONDecode_StdlibJSON — full encoding/json.Unmarshal including parsing.
+// pre-bound Accessors for the L3 path — resolved once at startup, like a real codec.
+var (
+	pdIDAccJD       = mustMakeAccessor[int64](&Product{}, "ID")
+	pdSKUAccJD      = mustMakeAccessor[string](&Product{}, "SKU")
+	pdTitleAccJD    = mustMakeAccessor[string](&Product{}, "Title")
+	pdDescAccJD     = mustMakeAccessor[string](&Product{}, "Description")
+	pdPriceAccJD    = mustMakeAccessor[float64](&Product{}, "Price")
+	pdStockAccJD    = mustMakeAccessor[int](&Product{}, "Stock")
+	pdWeightAccJD   = mustMakeAccessor[float64](&Product{}, "Weight")
+	pdActiveAccJD   = mustMakeAccessor[bool](&Product{}, "Active")
+	pdCategoryAccJD = mustMakeAccessor[string](&Product{}, "Category")
+	pdTagsAccJD     = mustMakeAccessor[string](&Product{}, "Tags")
+)
+
+// BenchmarkJSONDecode_StdlibJSON — full encoding/json.Unmarshal including JSON parsing.
 func BenchmarkJSONDecode_StdlibJSON(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
@@ -67,8 +82,9 @@ func BenchmarkJSONDecode_StdlibJSON(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONDecode_Saferefl — Layer 1 Set[T] per field (pre-parsed values).
-func BenchmarkJSONDecode_Saferefl(b *testing.B) {
+// BenchmarkJSONDecode_L1 — Layer 1: Set[T] per field with per-call name resolution.
+// Equivalent in cost to Reflect: both resolve field names dynamically per call.
+func BenchmarkJSONDecode_L1(b *testing.B) {
 	dst := &Product{}
 	b.ResetTimer()
 	for range b.N {
@@ -86,21 +102,24 @@ func BenchmarkJSONDecode_Saferefl(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONDecode_Reflect — stdlib reflect SetField per field (pre-parsed values).
+// BenchmarkJSONDecode_Reflect — stdlib reflect: FieldByName per field, per-call resolution.
+// Same cost model as L1 — both resolve field names on every call with no pre-binding.
 func BenchmarkJSONDecode_Reflect(b *testing.B) {
-	srcV := reflect.ValueOf(productSrc)
 	dst := Product{}
 	dstV := reflect.ValueOf(&dst).Elem()
+	src := productSrc
+	srcV := reflect.ValueOf(src)
 	b.ResetTimer()
 	for range b.N {
-		for i := 0; i < dstV.NumField(); i++ {
-			dstV.Field(i).Set(srcV.Field(i))
+		for _, name := range productFieldNames {
+			dstV.FieldByName(name).Set(srcV.FieldByName(name))
 		}
 		sinkInt64 = dst.ID
 	}
 }
 
-// BenchmarkJSONDecode_Reflect2 — reflect2 UnsafeSet per field with pre-cached descriptors (pre-parsed values).
+// BenchmarkJSONDecode_Reflect2 — reflect2: pre-compiled field descriptors + UnsafeSet.
+// Represents a well-optimised codec that caches reflect2 metadata at startup.
 func BenchmarkJSONDecode_Reflect2(b *testing.B) {
 	dst := Product{}
 	dstPtr := unsafe.Pointer(&dst)
@@ -108,9 +127,31 @@ func BenchmarkJSONDecode_Reflect2(b *testing.B) {
 	srcPtr := unsafe.Pointer(&src)
 	b.ResetTimer()
 	for range b.N {
-		for _, f := range productFields {
-			f.field2.UnsafeSet(dstPtr, unsafe.Pointer(uintptr(srcPtr)+f.offset))
+		for i, f := range productFields2 {
+			f.UnsafeSet(dstPtr, unsafe.Pointer(uintptr(srcPtr)+productOffsets[i]))
 		}
+		sinkInt64 = dst.ID
+	}
+}
+
+// BenchmarkJSONDecode_L3 — Layer 3: pre-bound Accessor per field, pointer arithmetic only.
+// Represents a generated/pre-compiled codec where field bindings are resolved once at startup.
+func BenchmarkJSONDecode_L3(b *testing.B) {
+	dst := &Product{}
+	ptr := saferefl.UnsafePtrOf(dst)
+	src := productSrc
+	b.ResetTimer()
+	for range b.N {
+		pdIDAccJD.Set(ptr, src.ID)
+		pdSKUAccJD.Set(ptr, src.SKU)
+		pdTitleAccJD.Set(ptr, src.Title)
+		pdDescAccJD.Set(ptr, src.Description)
+		pdPriceAccJD.Set(ptr, src.Price)
+		pdStockAccJD.Set(ptr, src.Stock)
+		pdWeightAccJD.Set(ptr, src.Weight)
+		pdActiveAccJD.Set(ptr, src.Active)
+		pdCategoryAccJD.Set(ptr, src.Category)
+		pdTagsAccJD.Set(ptr, src.Tags)
 		sinkInt64 = dst.ID
 	}
 }

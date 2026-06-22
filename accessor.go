@@ -76,25 +76,66 @@ func (a Accessor[T]) Set(objPtr unsafe.Pointer, val T) {
 }
 
 // GetFrom reads the field from obj, handling the interface-to-pointer
-// conversion automatically. Slower than Get but more convenient.
+// conversion automatically. Use Get with a pre-extracted [UnsafePtrOf]
+// pointer for maximum throughput in tight loops.
 func (a Accessor[T]) GetFrom(obj any) (T, error) {
-	p, _, err := structPtrOf(obj)
-	if err != nil {
+	e := (*eface)(unsafe.Pointer(&obj))
+	// Validate without reflect.TypeOf: read the kind byte directly from the
+	// eface type word and compare. This avoids the full reflect.Type wrapping
+	// and the Elem().Kind() check (the Accessor was already validated for a
+	// pointer-to-struct type at MakeAccessor time).
+	if e._typ == nil || efaceKind(e._typ) != reflect.Pointer || e.data == nil {
 		var zero T
-		return zero, err
+		return zero, fromError(obj)
 	}
-	return a.Get(p), nil
+	return a.Get(e.data), nil
 }
 
 // SetOn writes val to the field in obj, handling the interface-to-pointer
-// conversion automatically. Slower than Set but more convenient.
+// conversion automatically. Use Set with a pre-extracted [UnsafePtrOf]
+// pointer for maximum throughput in tight loops.
 func (a Accessor[T]) SetOn(obj any, val T) error {
-	p, _, err := structPtrOf(obj)
-	if err != nil {
-		return err
+	e := (*eface)(unsafe.Pointer(&obj))
+	if e._typ == nil || efaceKind(e._typ) != reflect.Pointer || e.data == nil {
+		return fromError(obj)
 	}
-	a.Set(p, val)
+	a.Set(e.data, val)
 	return nil
+}
+
+// efaceKind returns the reflect.Kind of the dynamic type stored in the eface
+// type word without constructing a full reflect.Type. It reads the Kind_ byte
+// from Go's internal abi.Type struct at byte offset 23 (64-bit platforms).
+// This offset has been stable since Go 1.18 and is the same byte reflect.Kind()
+// returns, so any future change would break reflect itself first.
+//
+//go:nosplit
+func efaceKind(typ unsafe.Pointer) reflect.Kind {
+	// abi.Type layout (64-bit):
+	//   Size_       uintptr  (0)
+	//   PtrBytes    uintptr  (8)
+	//   Hash        uint32   (16)
+	//   Tflag       uint8    (20)
+	//   Align_      uint8    (21)
+	//   FieldAlign_ uint8    (22)
+	//   Kind_       uint8    (23) ← this field
+	const kindOffset = 23
+	return reflect.Kind(*(*uint8)(unsafe.Pointer(uintptr(typ)+kindOffset)) & 0x1f)
+}
+
+// fromError builds a descriptive error for GetFrom/SetOn misuse.
+// Kept out-of-line to avoid polluting the fast path's register allocation.
+//
+//go:noinline
+func fromError(obj any) error {
+	if obj == nil {
+		return fmt.Errorf("saferefl: obj must not be nil")
+	}
+	t := reflect.TypeOf(obj)
+	if t.Kind() != reflect.Pointer {
+		return fmt.Errorf("saferefl: obj must be a pointer to struct, got %v", t.Kind())
+	}
+	return fmt.Errorf("saferefl: obj pointer must not be nil")
 }
 
 // UnsafePtrOf returns the raw pointer to the struct pointed to by obj.

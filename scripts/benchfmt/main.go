@@ -24,9 +24,13 @@ import (
 func main() {
 	outputPath := flag.String("output", "benchmarks/RESULTS.md", "path for benchmark results Markdown")
 	readmePath := flag.String("readme", "", "README.md to inject results into (optional)")
+	goVersion := flag.String("go-version", "", "Go version label for the output header (e.g. 1.22)")
 	flag.Parse()
 
 	env, groups := parseBenchOutput(os.Stdin)
+	if *goVersion != "" {
+		env.goVersion = *goVersion
+	}
 	md := renderMarkdown(env, groups)
 
 	if err := os.WriteFile(*outputPath, []byte(md), 0o644); err != nil {
@@ -45,7 +49,7 @@ func main() {
 // --- Domain types ---
 
 type benchEnv struct {
-	date, goos, goarch, cpu string
+	date, goos, goarch, cpu, goVersion string
 }
 
 type group struct {
@@ -184,6 +188,9 @@ func renderMarkdown(env benchEnv, groups []group) string {
 
 	sb.WriteString("# Benchmark Results\n\n")
 	fmt.Fprintf(&sb, "**Generated:** %s  \n", env.date)
+	if env.goVersion != "" {
+		fmt.Fprintf(&sb, "**Go:** %s  \n", env.goVersion)
+	}
 	if env.goos != "" {
 		fmt.Fprintf(&sb, "**Platform:** %s/%s  \n", env.goos, env.goarch)
 	}

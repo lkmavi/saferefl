@@ -1,0 +1,105 @@
+name: Go Pre-release Compatibility
+
+# Runs every Monday against the Go tip build to catch breaking changes before
+# they reach a stable release. Opens or updates a GitHub issue on failure so
+# the team sees it quickly without watching CI logs.
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'  # Monday 8:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  CGO_ENABLED: "1"
+
+jobs:
+  gotip:
+    name: Test (go tip)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Cache gotip SDK
+        id: cache-gotip
+        uses: actions/cache@v4
+        with:
+          path: ~/sdk/gotip
+          key: gotip-${{ runner.os }}-${{ hashFiles('go.mod') }}
+          restore-keys: gotip-${{ runner.os }}-
+
+      - name: Install gotip launcher
+        run: go install golang.org/dl/gotip@latest
+
+      - name: Download gotip (skipped on cache hit)
+        if: steps.cache-gotip.outputs.cache-hit != 'true'
+        run: gotip download
+
+      - name: Build
+        run: |
+          gotip build ./...
+          gotip build -tags unsafe_accel ./...
+          gotip build -tags reflectx_strict ./...
+
+      - name: Test (default tags)
+        run: gotip test -race -count=1 ./...
+
+      - name: Test (unsafe_accel)
+        run: gotip test -race -count=1 -tags unsafe_accel ./...
+
+      - name: Test (reflectx_strict)
+        run: gotip test -race -count=1 -tags reflectx_strict ./...
+
+      - name: Report failure or update existing issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const today   = new Date().toISOString().slice(0, 10);
+            const marker  = '[go-tip-compat]';
+
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              state: 'open',
+              per_page: 50,
+            });
+
+            const existing = openIssues.find(i => i.title.startsWith(marker));
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner:        context.repo.owner,
+                repo:         context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing as of **${today}**. Run: ${runUrl}`,
+              });
+              console.log(`Updated existing issue #${existing.number}`);
+            } else {
+              const { data: created } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo:  context.repo.repo,
+                title: `${marker} Go tip compatibility failure`,
+                body: [
+                  '## Go tip compatibility failure',
+                  '',
+                  `Tests against Go tip started failing on **${today}**.`,
+                  '',
+                  `**First failing run:** ${runUrl}`,
+                  '',
+                  'This issue is auto-updated every Monday until resolved.',
+                  'Close it once the root cause is fixed.',
+                ].join('\n'),
+                labels: [],
+              });
+              console.log(`Created issue #${created.number}`);
+            }
