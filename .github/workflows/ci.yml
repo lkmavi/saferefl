@@ -136,7 +136,6 @@ jobs:
         with:
           use_oidc: true
           files: ./coverage-default.txt,./coverage-strict.txt
-          flags: stable
           name: codecov-saferefl-stable
           fail_ci_if_error: true
 
@@ -146,7 +145,6 @@ jobs:
         with:
           use_oidc: true
           files: ./coverage-legacy.txt
-          flags: go122
           name: codecov-saferefl-go122
           fail_ci_if_error: true
 
