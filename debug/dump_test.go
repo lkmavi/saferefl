@@ -2,6 +2,8 @@ package debug
 
 import (
 	"bytes"
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -51,6 +53,20 @@ func TestStructDump_kindLabels(t *testing.T) {
 	}
 }
 
+func TestKindLabel_mapAndStruct(t *testing.T) {
+	type nested struct{ V int }
+
+	mapType := reflect.TypeOf(map[string]int{})
+	if got := kindLabel(reflect.Map, mapType); got != "map[string]int" {
+		t.Errorf("kindLabel(Map) = %q, want %q", got, "map[string]int")
+	}
+
+	nestType := reflect.TypeOf(nested{})
+	if got := kindLabel(reflect.Struct, nestType); got != "struct nested" {
+		t.Errorf("kindLabel(Struct) = %q, want %q", got, "struct nested")
+	}
+}
+
 func TestStructDump_nilObj(t *testing.T) {
 	if err := StructDump(nil, &bytes.Buffer{}); err == nil {
 		t.Fatal("expected error for nil obj")
@@ -74,5 +90,16 @@ func TestStructDump_notStruct(t *testing.T) {
 	n := 42
 	if err := StructDump(&n, &bytes.Buffer{}); err == nil {
 		t.Fatal("expected error for pointer to non-struct")
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write error") }
+
+func TestStructDump_writeError(t *testing.T) {
+	s := &dumpSample{ID: 1}
+	if err := StructDump(s, failingWriter{}); err == nil {
+		t.Error("expected error from failing writer, got nil")
 	}
 }

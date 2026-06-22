@@ -39,6 +39,26 @@ func TestAccelAvailable(t *testing.T) {
 	}
 }
 
+func TestEnableAccel(t *testing.T) {
+	err := EnableAccel()
+	if AccelAvailable() && err != nil {
+		t.Errorf("EnableAccel() = %v, want nil when AccelAvailable=true", err)
+	}
+	if !AccelAvailable() && err == nil {
+		t.Error("EnableAccel() = nil, want error when AccelAvailable=false")
+	}
+}
+
+func TestEnableAccel_whenFailed(t *testing.T) {
+	prev := accelOK
+	accelOK = false
+	defer func() { accelOK = prev }()
+
+	if err := EnableAccel(); err == nil {
+		t.Error("EnableAccel() = nil, want error when accelOK=false")
+	}
+}
+
 func TestUnsafeFieldPtr_matches_reflect(t *testing.T) {
 	type sample struct {
 		X int

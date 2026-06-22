@@ -107,6 +107,13 @@ func TestGet_non_ptr_obj(t *testing.T) {
 	}
 }
 
+func TestGet_ptrToNonStruct(t *testing.T) {
+	_, err := saferefl.Get[int](new(int), "Field")
+	if err == nil {
+		t.Error("expected error for pointer to non-struct")
+	}
+}
+
 // --- MustGet tests ---
 
 func TestMustGet_panic_on_error(t *testing.T) {
@@ -278,6 +285,13 @@ func TestErrorMessages(t *testing.T) {
 
 // --- Additional edge-case tests ---
 
+func TestFields_nilObj(t *testing.T) {
+	_, err := saferefl.Fields(nil)
+	if err == nil {
+		t.Error("expected error for nil obj")
+	}
+}
+
 func TestFields_nonStruct(t *testing.T) {
 	_, err := saferefl.Fields(42)
 	if err == nil {
@@ -374,6 +388,10 @@ func TestMakeAccessor_dotpath_pointer(t *testing.T) {
 	if v := acc.Get(saferefl.UnsafePtrOf(e)); v != "NYC" {
 		t.Errorf("Get Contact.City = %q, want NYC", v)
 	}
+	acc.Set(saferefl.UnsafePtrOf(e), "London")
+	if e.Contact.City != "London" {
+		t.Errorf("after Set via chain, Contact.City = %q, want London", e.Contact.City)
+	}
 }
 
 func TestMakeAccessor_typeMismatch(t *testing.T) {
@@ -397,6 +415,56 @@ func TestMakeAccessor_fieldNotFound(t *testing.T) {
 	var fnf *saferefl.FieldNotFoundError
 	if !errors.As(err, &fnf) {
 		t.Errorf("want FieldNotFoundError, got %T", err)
+	}
+}
+
+func TestMakeAccessor_nilObj(t *testing.T) {
+	if _, err := saferefl.MakeAccessor[string](nil, "Name"); err == nil {
+		t.Fatal("expected error for nil obj, got nil")
+	}
+}
+
+func TestMakeAccessor_nonPtrObj(t *testing.T) {
+	if _, err := saferefl.MakeAccessor[string](person{}, "Name"); err == nil {
+		t.Fatal("expected error for non-pointer obj, got nil")
+	}
+}
+
+func TestMakeAccessor_ptrToNonStruct(t *testing.T) {
+	if _, err := saferefl.MakeAccessor[int](new(int), "Field"); err == nil {
+		t.Fatal("expected error for pointer to non-struct, got nil")
+	}
+}
+
+func TestMakeAccessor_intermediateNotStruct(t *testing.T) {
+	// "Name.Sub" where Name is a string — intermediate segment is not a struct.
+	if _, err := saferefl.MakeAccessor[string](&person{}, "Name.Sub"); err == nil {
+		t.Fatal("expected error for non-struct intermediate segment, got nil")
+	}
+}
+
+func TestMakeAccessor_getFrom_setOn_errors(t *testing.T) {
+	acc, _ := saferefl.MakeAccessor[string](&person{}, "Name")
+
+	if _, err := acc.GetFrom(nil); err == nil {
+		t.Error("GetFrom(nil): expected error, got nil")
+	}
+	if _, err := acc.GetFrom(42); err == nil {
+		t.Error("GetFrom(non-ptr): expected error, got nil")
+	}
+	if err := acc.SetOn(nil, "x"); err == nil {
+		t.Error("SetOn(nil): expected error, got nil")
+	}
+}
+
+func TestSet_interfaceField(t *testing.T) {
+	type withAny struct{ V any }
+	s := &withAny{}
+	if err := saferefl.Set[string](s, "V", "hello"); err != nil {
+		t.Fatalf("Set interface field: %v", err)
+	}
+	if s.V != "hello" {
+		t.Errorf("V = %v, want hello", s.V)
 	}
 }
 
