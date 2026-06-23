@@ -14,6 +14,7 @@ type cacheEntry struct {
 }
 
 var globalCache sync.Map // reflect.Type → *cacheEntry
+var ptrCache sync.Map    // uintptr (raw *abi.Type of *StructT) → *TypeDescriptor
 
 // testHookBuildDescriptor is called at the start of buildDescriptor if non-nil.
 // Used in tests to count invocations and verify single construction.
@@ -42,6 +43,21 @@ func TypeDescriptorOf(t reflect.Type) *TypeDescriptor {
 	e := v.(*cacheEntry)
 	e.once.Do(func() { e.desc.Store(buildDescriptor(t)) })
 	return e.desc.Load()
+}
+
+// PtrCacheLoad returns the TypeDescriptor for the struct type whose pointer type
+// has the given raw *abi.Type address, avoiding reflect.Type.Elem() on the hot path.
+func PtrCacheLoad(ptrTypeKey uintptr) (*TypeDescriptor, bool) {
+	v, ok := ptrCache.Load(ptrTypeKey)
+	if !ok {
+		return nil, false
+	}
+	return v.(*TypeDescriptor), true
+}
+
+// PtrCacheStore records desc under ptrTypeKey so future calls to PtrCacheLoad skip t.Elem().
+func PtrCacheStore(ptrTypeKey uintptr, desc *TypeDescriptor) {
+	ptrCache.LoadOrStore(ptrTypeKey, desc)
 }
 
 func buildDescriptor(t reflect.Type) *TypeDescriptor {

@@ -92,9 +92,9 @@ func BenchmarkStructCopy_Manual(b *testing.B) {
 	}
 }
 
-// BenchmarkStructCopy_L3 — Layer 3: pre-bound Accessor pairs, direct pointer arithmetic.
+// BenchmarkStructCopy_Accessor — Layer 3: pre-bound Accessor pairs, direct pointer arithmetic.
 // Simulates a real copy pipeline where bindings are resolved once at startup.
-func BenchmarkStructCopy_L3(b *testing.B) {
+func BenchmarkStructCopy_Accessor(b *testing.B) {
 	src := newUserSrc()
 	dst := &UserDst{}
 	srcPtr := saferefl.UnsafePtrOf(&src)
@@ -126,10 +126,10 @@ func BenchmarkStructCopy_Reflect2(b *testing.B) {
 	}
 }
 
-// BenchmarkStructCopy_L2 — Layer 2 path: pre-computed offsets + reflect.NewAt per field.
+// BenchmarkStructCopy_Offset — Layer 2 path: pre-computed offsets + reflect.NewAt per field.
 // Slower than Reflect2 (reflect2.UnsafeSet avoids reflect.Value allocation), but faster
 // than per-call FieldByName and entirely allocation-free.
-func BenchmarkStructCopy_L2(b *testing.B) {
+func BenchmarkStructCopy_Offset(b *testing.B) {
 	src := newUserSrc()
 	dst := &UserDst{}
 	srcPtr := unsafe.Pointer(&src)
@@ -161,8 +161,8 @@ func BenchmarkStructCopy_Reflect(b *testing.B) {
 	}
 }
 
-// BenchmarkStructCopy_L1 — Layer 1: Get[T]/Set[T] per field with per-call name resolution.
-func BenchmarkStructCopy_L1(b *testing.B) {
+// BenchmarkStructCopy_SafeRefl — Layer 1: Get[T]/Set[T] per field with per-call name resolution.
+func BenchmarkStructCopy_SafeRefl(b *testing.B) {
 	src := newUserSrc()
 	dst := &UserDst{}
 	b.ResetTimer()

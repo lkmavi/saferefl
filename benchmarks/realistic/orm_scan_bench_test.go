@@ -86,8 +86,8 @@ func BenchmarkORMScan_Manual(b *testing.B) {
 	}
 }
 
-// BenchmarkORMScan_L1 — Layer 1: Set[T] per column using pre-mapped field names.
-func BenchmarkORMScan_L1(b *testing.B) {
+// BenchmarkORMScan_SafeRefl — Layer 1: Set[T] per column using pre-mapped field names.
+func BenchmarkORMScan_SafeRefl(b *testing.B) {
 	row := &ORMRow{}
 	vals := rowValues
 	b.ResetTimer()
@@ -106,9 +106,9 @@ func BenchmarkORMScan_L1(b *testing.B) {
 	}
 }
 
-// BenchmarkORMScan_L3 — Layer 3: pre-bound Accessor per column.
+// BenchmarkORMScan_Accessor — Layer 3: pre-bound Accessor per column.
 // Simulates real ORM: prepare bindings once per statement, scan every row in the hot loop.
-func BenchmarkORMScan_L3(b *testing.B) {
+func BenchmarkORMScan_Accessor(b *testing.B) {
 	row := &ORMRow{}
 	ptr := saferefl.UnsafePtrOf(row)
 	vals := rowValues

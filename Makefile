@@ -26,11 +26,10 @@ bench-local:
 		./scripts/bench.sh; \
 	fi
 
-# Cross-version benchmarks via Docker (builds first, then runs sequentially).
+# Cross-version benchmarks via Docker: Go 1.22 (hmap) and 1.24 (Swiss Tables).
 # Usage: make bench-docker
 #        REBUILD=0 make bench-docker      — skip rebuild if images exist
 #        COUNT=1 make bench-docker        — quick single-pass
-#        PARALLEL=2 make bench-docker     — run 2 containers at once
 bench-docker:
 	./scripts/bench-versions.sh
 

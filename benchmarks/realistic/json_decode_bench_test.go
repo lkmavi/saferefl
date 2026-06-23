@@ -82,9 +82,9 @@ func BenchmarkJSONDecode_StdlibJSON(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONDecode_L1 — Layer 1: Set[T] per field with per-call name resolution.
+// BenchmarkJSONDecode_SafeRefl — Layer 1: Set[T] per field with per-call name resolution.
 // Equivalent in cost to Reflect: both resolve field names dynamically per call.
-func BenchmarkJSONDecode_L1(b *testing.B) {
+func BenchmarkJSONDecode_SafeRefl(b *testing.B) {
 	dst := &Product{}
 	b.ResetTimer()
 	for range b.N {
@@ -134,9 +134,9 @@ func BenchmarkJSONDecode_Reflect2(b *testing.B) {
 	}
 }
 
-// BenchmarkJSONDecode_L3 — Layer 3: pre-bound Accessor per field, pointer arithmetic only.
+// BenchmarkJSONDecode_Accessor — Layer 3: pre-bound Accessor per field, pointer arithmetic only.
 // Represents a generated/pre-compiled codec where field bindings are resolved once at startup.
-func BenchmarkJSONDecode_L3(b *testing.B) {
+func BenchmarkJSONDecode_Accessor(b *testing.B) {
 	dst := &Product{}
 	ptr := saferefl.UnsafePtrOf(dst)
 	src := productSrc

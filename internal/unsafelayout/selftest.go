@@ -15,7 +15,7 @@ var accelOK bool
 func init() {
 	accelOK = runSelfTest()
 	if !accelOK {
-		msg := "[saferefl] Layer 3 unsafe accelerator self-test FAILED — falling back to Layer 2"
+		msg := "[saferefl] unsafe accelerator self-test FAILED — unsafe primitives will return incorrect results"
 		if _, strict := os.LookupEnv("SAFEREFL_STRICT"); strict {
 			panic(msg)
 		}
@@ -24,19 +24,20 @@ func init() {
 }
 
 // AccelAvailable reports whether the self-test passed on this Go version and arch.
-// When false, all Layer 3 operations degrade gracefully to the Layer 2 reflect path.
+// When false, unsafe primitive functions may return incorrect results; call EnableAccel
+// at startup to surface a descriptive error instead of silently reading stale data.
 func AccelAvailable() bool { return accelOK }
 
 // EnableAccel returns nil if the self-test passed, or a descriptive error.
-// Call at program startup to confirm Layer 3 is active; absence of a call is safe.
+// Call at program startup to confirm the accelerator is active; absence of a call is safe.
 func EnableAccel() error {
 	if !accelOK {
-		return errors.New("saferefl: Layer 3 unsafe accelerator failed self-test on this Go version/arch")
+		return errors.New("saferefl: unsafe accelerator failed self-test on this Go version/arch")
 	}
 	return nil
 }
 
-// runSelfTest verifies each Layer 3 assumption against the reflect baseline.
+// runSelfTest verifies each unsafe layout assumption against the reflect baseline.
 // Returns true only if every check passes.
 func runSelfTest() bool {
 	return selfTestStruct() && selfTestSlice() && selfTestMap()

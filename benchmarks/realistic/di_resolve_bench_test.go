@@ -51,8 +51,8 @@ func BenchmarkDIResolve_Manual(b *testing.B) {
 	}
 }
 
-// BenchmarkDIResolve_L1 — Layer 1: Set[*ServiceX] per dependency.
-func BenchmarkDIResolve_L1(b *testing.B) {
+// BenchmarkDIResolve_SafeRefl — Layer 1: Set[*ServiceX] per dependency.
+func BenchmarkDIResolve_SafeRefl(b *testing.B) {
 	a := registry["A"].(*ServiceA)
 	bc := registry["B"].(*ServiceB)
 	c := registry["C"].(*ServiceC)
@@ -66,9 +66,9 @@ func BenchmarkDIResolve_L1(b *testing.B) {
 	}
 }
 
-// BenchmarkDIResolve_L3 — Layer 3: pre-bound Accessor, inject per request.
+// BenchmarkDIResolve_Accessor — Layer 3: pre-bound Accessor, inject per request.
 // Simulates real DI: resolve bindings once at startup, inject on every request.
-func BenchmarkDIResolve_L3(b *testing.B) {
+func BenchmarkDIResolve_Accessor(b *testing.B) {
 	a := registry["A"].(*ServiceA)
 	bc := registry["B"].(*ServiceB)
 	c := registry["C"].(*ServiceC)

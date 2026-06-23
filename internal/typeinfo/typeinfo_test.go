@@ -3,7 +3,6 @@ package typeinfo
 import (
 	"reflect"
 	"testing"
-	"unsafe"
 )
 
 // --- test fixtures ---
@@ -29,12 +28,6 @@ type taggedStruct struct {
 	Age   int    `json:"age,omitempty"`
 	Email string `json:"email" db:"email_col"`
 	score float64
-}
-
-type rwStruct struct {
-	ID   int64
-	Name string
-	Rate float64
 }
 
 // --- TypeDescriptor tests ---
@@ -151,65 +144,6 @@ func TestBuildDescriptor_unexportedField(t *testing.T) {
 	}
 	if scoreFM.Exported {
 		t.Error("'score' should have Exported=false")
-	}
-}
-
-// --- GetFieldPtr / SetField tests ---
-
-func TestGetSetField_roundtrip(t *testing.T) {
-	rt := reflect.TypeOf(rwStruct{})
-	desc := buildDescriptor(rt)
-	s := &rwStruct{ID: 42, Name: "hello", Rate: 3.14}
-	objPtr := unsafe.Pointer(s)
-
-	idFM := desc.FieldsByName["ID"]
-	if id := *(*int64)(GetFieldPtr(objPtr, idFM)); id != 42 {
-		t.Errorf("GetFieldPtr ID = %d, want 42", id)
-	}
-
-	nameFM := desc.FieldsByName["Name"]
-	if name := *(*string)(GetFieldPtr(objPtr, nameFM)); name != "hello" {
-		t.Errorf("GetFieldPtr Name = %q, want hello", name)
-	}
-
-	rateFM := desc.FieldsByName["Rate"]
-	if rate := *(*float64)(GetFieldPtr(objPtr, rateFM)); rate != 3.14 {
-		t.Errorf("GetFieldPtr Rate = %v, want 3.14", rate)
-	}
-
-	if err := SetField(objPtr, idFM, reflect.ValueOf(int64(99))); err != nil {
-		t.Fatalf("SetField ID: %v", err)
-	}
-	if s.ID != 99 {
-		t.Errorf("after SetField ID = %d, want 99", s.ID)
-	}
-
-	if err := SetField(objPtr, nameFM, reflect.ValueOf("world")); err != nil {
-		t.Fatalf("SetField Name: %v", err)
-	}
-	if s.Name != "world" {
-		t.Errorf("after SetField Name = %q, want world", s.Name)
-	}
-}
-
-func TestSetField_unexportedReturnsError(t *testing.T) {
-	rt := reflect.TypeOf(taggedStruct{})
-	desc := buildDescriptor(rt)
-	s := &taggedStruct{}
-	err := SetField(unsafe.Pointer(s), desc.FieldsByName["score"], reflect.ValueOf(1.0))
-	if err == nil {
-		t.Error("expected error setting unexported field, got nil")
-	}
-}
-
-func TestSetField_typeMismatchReturnsError(t *testing.T) {
-	rt := reflect.TypeOf(rwStruct{})
-	desc := buildDescriptor(rt)
-	s := &rwStruct{}
-	// Attempt to assign string to int64 field.
-	err := SetField(unsafe.Pointer(s), desc.FieldsByName["ID"], reflect.ValueOf("oops"))
-	if err == nil {
-		t.Error("expected type-mismatch error, got nil")
 	}
 }
 
