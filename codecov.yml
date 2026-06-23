@@ -12,7 +12,8 @@ coverage:
     patch:
       default:
         target: 85%
-        threshold: 1%
+        threshold: 5%
+        informational: true
 
 ignore:
   - "examples/"

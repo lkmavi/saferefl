@@ -9,37 +9,6 @@ import (
 	"github.com/lkmavi/saferefl/internal/typeinfo"
 )
 
-// eface is the memory layout of an empty interface (any).
-// For pointer types, the data word holds the pointer value directly.
-type eface struct {
-	_typ unsafe.Pointer
-	data unsafe.Pointer
-}
-
-// structPtrOf returns a pointer to obj's underlying struct and the struct's reflect.Type.
-// obj must be a non-nil pointer to a struct.
-func structPtrOf(obj any) (unsafe.Pointer, reflect.Type, error) {
-	if obj == nil {
-		return nil, nil, fmt.Errorf("saferefl: obj must not be nil")
-	}
-	// reflect.TypeOf is cheaper than reflect.ValueOf: it inspects only the type word.
-	t := reflect.TypeOf(obj)
-	if t.Kind() != reflect.Pointer {
-		return nil, nil, fmt.Errorf("saferefl: obj must be a pointer to struct, got %v", t.Kind())
-	}
-	elem := t.Elem()
-	if elem.Kind() != reflect.Struct {
-		return nil, nil, fmt.Errorf("saferefl: obj must point to a struct, got pointer to %v", elem.Kind())
-	}
-	// For pointer types, the interface data word holds the pointer value itself.
-	// This avoids the more expensive reflect.Value path.
-	p := (*eface)(unsafe.Pointer(&obj)).data
-	if p == nil {
-		return nil, nil, fmt.Errorf("saferefl: obj pointer must not be nil")
-	}
-	return p, elem, nil
-}
-
 // resolvePath walks fieldPath (dot-separated segments) from objPtr of structType and
 // returns a pointer to the target field along with its metadata.
 //
@@ -66,7 +35,7 @@ func resolvePath(objPtr unsafe.Pointer, structType reflect.Type, fieldPath strin
 			}
 		}
 
-		fieldPtr := typeinfo.GetFieldFast(currentPtr, fm)
+		fieldPtr := unsafe.Pointer(uintptr(currentPtr) + fm.Offset)
 
 		if !hasMore {
 			return fieldPtr, fm, nil

@@ -12,14 +12,26 @@ import (
 // sinkIntPtr prevents the compiler from optimising away slice-element reads.
 var sinkIntPtr *int
 
-// ---- FieldRead: layer comparison for a single int field ----
+// ---- FieldRead: variant comparison for a single int field ----
 //
-// Reflect = stdlib reflect with pre-cached reflect.Value (fastest reflect path)
-// L1      = saferefl.Get[int] — full path resolution per call
-// L3      = Accessor.Get — pre-bound, pointer arithmetic only
-// Native  = direct struct field access (theoretical minimum)
+// Reflect     = stdlib reflect: FieldByName per call (standard usage, fair baseline)
+// ReflectFast = stdlib reflect: pre-cached Value + Field(0) (best possible reflect)
+// SafeRefl    = saferefl.Get[int]: named access, path resolution per call
+// Offset      = pre-computed offset + reflect.NewAt (internal mechanism saferefl uses)
+// Accessor    = Accessor.Get: pre-bound, pointer arithmetic only
+// Native      = direct struct field access (theoretical minimum)
 
+// BenchmarkFieldRead_Reflect — stdlib reflect: FieldByName per call.
 func BenchmarkFieldRead_Reflect(b *testing.B) {
+	u := &benchUser{ID: 42}
+	b.ResetTimer()
+	for i := range b.N {
+		sinkInt = int(reflect.ValueOf(u).Elem().FieldByName("ID").Int()) + i
+	}
+}
+
+// BenchmarkFieldRead_ReflectFast — stdlib reflect: pre-cached Value + Field(0).
+func BenchmarkFieldRead_ReflectFast(b *testing.B) {
 	u := &benchUser{ID: 42}
 	rv := reflect.ValueOf(u).Elem()
 	b.ResetTimer()
@@ -28,7 +40,8 @@ func BenchmarkFieldRead_Reflect(b *testing.B) {
 	}
 }
 
-func BenchmarkFieldRead_L1(b *testing.B) {
+// BenchmarkFieldRead_SafeRefl — saferefl.Get[int]: named access per call.
+func BenchmarkFieldRead_SafeRefl(b *testing.B) {
 	u := &benchUser{ID: 42}
 	b.ResetTimer()
 	for i := range b.N {
@@ -37,7 +50,8 @@ func BenchmarkFieldRead_L1(b *testing.B) {
 	}
 }
 
-func BenchmarkFieldRead_L2(b *testing.B) {
+// BenchmarkFieldRead_Offset — pre-computed offset + reflect.NewAt.
+func BenchmarkFieldRead_Offset(b *testing.B) {
 	u := &benchUser{ID: 42}
 	rt := reflect.TypeOf(benchUser{})
 	f, _ := rt.FieldByName("ID")
@@ -50,7 +64,8 @@ func BenchmarkFieldRead_L2(b *testing.B) {
 	}
 }
 
-func BenchmarkFieldRead_L3(b *testing.B) {
+// BenchmarkFieldRead_Accessor — Accessor.Get: pre-bound, pointer arithmetic only.
+func BenchmarkFieldRead_Accessor(b *testing.B) {
 	u := &benchUser{ID: 42}
 	ptr := saferefl.UnsafePtrOf(u)
 	b.ResetTimer()
@@ -59,6 +74,7 @@ func BenchmarkFieldRead_L3(b *testing.B) {
 	}
 }
 
+// BenchmarkFieldRead_Native — direct struct field read (theoretical minimum).
 func BenchmarkFieldRead_Native(b *testing.B) {
 	u := &benchUser{ID: 42}
 	b.ResetTimer()
@@ -67,9 +83,10 @@ func BenchmarkFieldRead_Native(b *testing.B) {
 	}
 }
 
-// ---- SliceAt: Layer 3 vs direct vs reflect ----
+// ---- SliceAt: saferefl.UnsafeSliceAt vs direct vs reflect ----
 
-func BenchmarkSliceAt_L3(b *testing.B) {
+// BenchmarkSliceAt_SafeRefl — saferefl.UnsafeSliceAt: direct element pointer, no bounds check.
+func BenchmarkSliceAt_SafeRefl(b *testing.B) {
 	s := make([]int, 1000)
 	for i := range s {
 		s[i] = i
@@ -81,6 +98,7 @@ func BenchmarkSliceAt_L3(b *testing.B) {
 	}
 }
 
+// BenchmarkSliceAt_Direct — &s[i]: bounds-checked element pointer.
 func BenchmarkSliceAt_Direct(b *testing.B) {
 	s := make([]int, 1000)
 	for i := range s {
@@ -92,6 +110,7 @@ func BenchmarkSliceAt_Direct(b *testing.B) {
 	}
 }
 
+// BenchmarkSliceAt_Reflect — reflect.Value.Index: reflect-based element access.
 func BenchmarkSliceAt_Reflect(b *testing.B) {
 	s := make([]int, 1000)
 	for i := range s {
@@ -104,7 +123,7 @@ func BenchmarkSliceAt_Reflect(b *testing.B) {
 	}
 }
 
-// ---- MapLen: Layer 3 vs builtin vs reflect ----
+// ---- MapLen: saferefl.MapLenFast vs builtin vs reflect ----
 
 func newBenchMap() map[string]int {
 	m := make(map[string]int, 100)
@@ -114,7 +133,8 @@ func newBenchMap() map[string]int {
 	return m
 }
 
-func BenchmarkMapLen_L3(b *testing.B) {
+// BenchmarkMapLen_SafeRefl — saferefl.MapLenFast: direct count read, no reflect.
+func BenchmarkMapLen_SafeRefl(b *testing.B) {
 	m := newBenchMap()
 	_ = saferefl.EnableAccel()
 	b.ResetTimer()
@@ -123,6 +143,7 @@ func BenchmarkMapLen_L3(b *testing.B) {
 	}
 }
 
+// BenchmarkMapLen_Builtin — len(m): builtin map length.
 func BenchmarkMapLen_Builtin(b *testing.B) {
 	m := newBenchMap()
 	b.ResetTimer()
@@ -131,6 +152,7 @@ func BenchmarkMapLen_Builtin(b *testing.B) {
 	}
 }
 
+// BenchmarkMapLen_Reflect — reflect.Value.Len(): reflect-based map length.
 func BenchmarkMapLen_Reflect(b *testing.B) {
 	m := newBenchMap()
 	rv := reflect.ValueOf(m)

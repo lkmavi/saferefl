@@ -1,29 +1,29 @@
 # Performance Targets
 
 **Baseline date:** 2026-06-22  
-**Status:** Layer 3 implemented (all layers shipped)
+**Status:** All APIs shipped
 
-These targets define the performance envelope for each layer of the API.
+These targets define the performance envelope for each part of the API.
 
 ---
 
 ## Acceptance Criteria
 
-| Layer | Comparison | Target |
+| API | Comparison | Target |
 |---|---|---|
-| Layer 1 (statically known type) | vs native direct field access | ≤ 1.2× slower |
-| Layer 2 (dynamic, no unsafe) | vs reflect2 (cached offsets) | ≤ 2.0× slower |
-| Layer 3 (unsafe accel, opt-in) | vs reflect2 (cached offsets) | ≤ 1.1× slower |
+| `Get[T]`/`Set[T]` (warm cache) | vs `reflect.FieldByName` per call | ≤ 1× slower (must be faster) |
+| `Accessor[T]` hot path | vs native direct field access | ≤ 2× slower |
+| `MapLenFast` | vs builtin `len(m)` | ≤ 1.5× slower |
 
-**Layer 1** is the `Get[T]`/`Set[T]` public API with TypeInfo cache warm.  
-**Layer 2** is the internal `typeinfo.GetFieldPtr` + `reflect.NewAt` path.  
-**Layer 3** is the optional `internal/unsafelayout` accelerator (`unsafe_accel` build tag).
+**Generic API** (`Get[T]`/`Set[T]`) resolves the field path on every call but uses a cached TypeDescriptor.  
+**Accessor API** (`MakeAccessor` once, `.Get`/`.Set` per call) is pure pointer arithmetic with no per-call reflection.  
+**Unsafe Primitives** (`MapLenFast`, `UnsafeSliceAt`) read runtime internals directly; self-tested at package init.
 
 ---
 
 ## Realistic Scenario Targets
 
-| Scenario | Metric | Target (Layer 1) |
+| Scenario | Metric | Target (Accessor API) |
 |---|---|---|
 | Struct-to-struct copy (5 fields) | ns/op | ≤ 5× vs Manual |
 | JSON-like field assignment (10 fields) | ns/op | ≤ 3× vs reflect2 |

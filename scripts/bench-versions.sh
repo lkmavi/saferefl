@@ -17,7 +17,7 @@
 set -euo pipefail
 
 if [ $# -eq 0 ]; then
-  VERSIONS=(1.22 1.23 1.24 1.25 1.26)
+  VERSIONS=(1.22 1.24)
 else
   VERSIONS=("$@")
 fi

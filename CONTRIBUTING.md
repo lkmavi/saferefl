@@ -59,7 +59,7 @@ bash scripts/pre-release-check.sh
 
 ```bash
 git add .
-git commit -m "feat(layer2): add FieldOffset caching for embedded structs"
+git commit -m "feat(cache): add FieldOffset caching for embedded structs"
 git push origin feat/your-feature
 ```
 
@@ -72,7 +72,7 @@ Then open a PR on GitHub.
 ### Requirements
 
 - [ ] All tests pass: `go test -race ./...`
-- [ ] All build-tag variants build: `-tags unsafe_accel`, `-tags reflectx_strict`
+- [ ] All build-tag variants build: `-tags reflectx_strict`
 - [ ] Linter passes: `golangci-lint run`
 - [ ] Code is formatted: `go fmt ./...`
 - [ ] CHANGELOG.md updated (for features/fixes)
@@ -81,13 +81,13 @@ Then open a PR on GitHub.
 ### PR Title Format
 
 ```
-feat(layer1): add Set[T] generic setter with field path
-feat(layer2): cache TypeInfo offsets for embedded structs
-feat(layer3): add Swiss Tables map backend for Go 1.24+
+feat(api): add Set[T] generic setter with field path
+feat(cache): cache TypeInfo offsets for embedded structs
+feat(accel): add Swiss Tables map backend for Go 1.24+
 fix(cache): race condition in sync.Map lookup under high concurrency
 docs: add migration guide from reflect2
-test(layer3): fuzz test for layer2 vs layer3 divergence
-perf(layer1): reduce allocations in Get[T] fast path
+test(accel): fuzz test for reflect vs unsafe result divergence
+perf(api): reduce allocations in Get[T] fast path
 ci: add Go 1.24 to test matrix
 chore: bump golangci-lint to v2.x
 ```
@@ -105,9 +105,9 @@ Brief description of changes.
 ## Testing
 How was this tested? Include benchmark results for perf changes.
 
-## Layer impact
-Which layer(s) does this touch (Layer 1 / Layer 2 / Layer 3)?
-If Layer 3: was the self-test updated?
+## Area impact
+Which area does this touch (Generic API / TypeInfo Cache / Unsafe Primitives)?
+If Unsafe Primitives: was the self-test updated?
 
 ## Related Issues
 Closes #123
@@ -142,21 +142,21 @@ if err != nil {
 
 ---
 
-## Architecture Layers (ADR-01)
+## Architecture
 
-This library has three layers. Contributions must respect layer boundaries:
+This library has three concerns. Contributions must respect their boundaries:
 
-| Layer | Location | What it does | Unsafe? |
-|-------|----------|--------------|---------|
-| Layer 1 | `*.go` (public) | Generics API: `Get[T]`, `Set[T]` | No |
-| Layer 2 | `internal/cache/` | TypeInfo cache via stdlib `reflect` | No |
-| Layer 3 | `internal/unsafelayout/` | Optional unsafe accelerator (build tag `unsafe_accel`) | Yes, self-tested |
+| Area | Location | What it does | Unsafe? |
+|------|----------|--------------|---------|
+| Generic API | `*.go` (public) | `Get[T]`, `Set[T]`, `Accessor[T]` | No |
+| TypeInfo Cache | `internal/typeinfo/` | Struct metadata via stdlib `reflect`, `sync.Map` | No |
+| Unsafe Primitives | `internal/unsafelayout/` | Optional accelerator: direct map/slice reads | Yes, self-tested |
 
-**Rules for Layer 3:**
+**Rules for Unsafe Primitives:**
 - Every `unsafe.Pointer` offset access must be validated by a synthetic self-test in `init()`
 - No `go:linkname` to private runtime symbols
 - Files must use build constraints: `//go:build go1.24` for Swiss Tables backend, `//go:build !go1.24` for legacy
-- If the self-test fails at init, fall back to Layer 2 — never silently corrupt data
+- If the self-test fails at init, log a warning — the caller should check [AccelAvailable]
 
 ---
 
@@ -185,10 +185,9 @@ type(scope): description
 
 | Scope | Description |
 |-------|-------------|
-| `layer1` | Generics public API |
-| `layer2` | TypeInfo cache |
-| `layer3` | Unsafe accelerator |
-| `cache` | Internal cache internals |
+| `api` | Generic public API (`Get[T]`, `Set[T]`, `Accessor[T]`) |
+| `cache` | TypeInfo cache internals |
+| `accel` | Unsafe accelerator (`internal/unsafelayout`) |
 | `selftest` | Self-test framework |
 | `bench` | Benchmarks |
 | `ci` | CI configuration |
@@ -202,12 +201,6 @@ type(scope): description
 
 ```bash
 go test -race ./...
-```
-
-### Run with unsafe accelerator
-
-```bash
-go test -race -tags unsafe_accel ./...
 ```
 
 ### Run strict mode (unsafe layer excluded from binary)
@@ -225,7 +218,7 @@ go test -bench=. -benchmem ./...
 ### Run fuzz tests (Go 1.22+)
 
 ```bash
-go test -fuzz=FuzzLayer2VsLayer3 -fuzztime=60s ./internal/unsafelayout/...
+go test -fuzz=FuzzUnsafeVsReflect -fuzztime=60s ./internal/unsafelayout/...
 ```
 
 ### Pre-Release Validation
@@ -240,8 +233,8 @@ bash scripts/pre-release-check.sh
 
 - **Benchmarks** — realistic profiles for JSON codec, ORM mapping, DI container scenarios
 - **Go version testing** — run the test suite on Go 1.22, 1.23, 1.24, and Go tip and report results
-- **Layer 3 backends** — Swiss Tables map layout for Go 1.24+ (`internal/unsafelayout`)
-- **Fuzz tests** — catching divergence between Layer 2 (reflect-based) and Layer 3 (unsafe) results
+- **Map backends** — Swiss Tables map layout for Go 1.24+ (`internal/unsafelayout`)
+- **Fuzz tests** — catching divergence between reflect-based and unsafe results
 - **Documentation** — usage examples, migration guide from `reflect2` / `json-iterator`
 
 ---

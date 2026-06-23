@@ -18,8 +18,8 @@ var (
 	sinkString string
 )
 
-// BenchmarkGet_int_L1 — Layer 1: Get[int] with full path resolution per call.
-func BenchmarkGet_int_L1(b *testing.B) {
+// BenchmarkGet_int_SafeRefl — saferefl.Get[int]: named field access per call.
+func BenchmarkGet_int_SafeRefl(b *testing.B) {
 	u := &benchUser{ID: 42}
 	b.ResetTimer()
 	for i := range b.N {
@@ -28,7 +28,17 @@ func BenchmarkGet_int_L1(b *testing.B) {
 	}
 }
 
+// BenchmarkGet_int_Reflect — stdlib reflect: FieldByName per call (fair per-call cost).
 func BenchmarkGet_int_Reflect(b *testing.B) {
+	u := &benchUser{ID: 42}
+	b.ResetTimer()
+	for i := range b.N {
+		sinkInt = int(reflect.ValueOf(u).Elem().FieldByName("ID").Int()) + i
+	}
+}
+
+// BenchmarkGet_int_ReflectFast — stdlib reflect: pre-cached Value + Field(0) (best possible reflect).
+func BenchmarkGet_int_ReflectFast(b *testing.B) {
 	u := &benchUser{ID: 42}
 	rv := reflect.ValueOf(u).Elem()
 	b.ResetTimer()
@@ -37,8 +47,8 @@ func BenchmarkGet_int_Reflect(b *testing.B) {
 	}
 }
 
-// BenchmarkGet_int_L2 — Layer 2: pre-computed offset + reflect.NewAt (warm TypeInfo cache path).
-func BenchmarkGet_int_L2(b *testing.B) {
+// BenchmarkGet_int_Offset — pre-computed offset + reflect.NewAt (internal cache mechanism).
+func BenchmarkGet_int_Offset(b *testing.B) {
 	u := &benchUser{ID: 42}
 	rt := reflect.TypeOf(benchUser{})
 	f, _ := rt.FieldByName("ID")
@@ -51,8 +61,8 @@ func BenchmarkGet_int_L2(b *testing.B) {
 	}
 }
 
-// BenchmarkSet_string_L1 — Layer 1: Set[string] with full path resolution per call.
-func BenchmarkSet_string_L1(b *testing.B) {
+// BenchmarkSet_string_SafeRefl — saferefl.Set[string]: named field write per call.
+func BenchmarkSet_string_SafeRefl(b *testing.B) {
 	u := &benchUser{}
 	b.ResetTimer()
 	for range b.N {
@@ -61,7 +71,18 @@ func BenchmarkSet_string_L1(b *testing.B) {
 	sinkString = u.Name
 }
 
+// BenchmarkSet_string_Reflect — stdlib reflect: FieldByName per call (fair per-call cost).
 func BenchmarkSet_string_Reflect(b *testing.B) {
+	u := &benchUser{}
+	b.ResetTimer()
+	for range b.N {
+		reflect.ValueOf(u).Elem().FieldByName("Name").SetString("Alice")
+	}
+	sinkString = u.Name
+}
+
+// BenchmarkSet_string_ReflectFast — stdlib reflect: pre-cached Value + Field(1) (best possible reflect).
+func BenchmarkSet_string_ReflectFast(b *testing.B) {
 	u := &benchUser{}
 	rv := reflect.ValueOf(u).Elem()
 	b.ResetTimer()
@@ -71,8 +92,8 @@ func BenchmarkSet_string_Reflect(b *testing.B) {
 	sinkString = u.Name
 }
 
-// BenchmarkSet_string_L2 — Layer 2: pre-computed offset + reflect.NewAt (warm TypeInfo cache path).
-func BenchmarkSet_string_L2(b *testing.B) {
+// BenchmarkSet_string_Offset — pre-computed offset + reflect.NewAt (internal cache mechanism).
+func BenchmarkSet_string_Offset(b *testing.B) {
 	u := &benchUser{}
 	rt := reflect.TypeOf(benchUser{})
 	f, _ := rt.FieldByName("Name")
@@ -101,8 +122,8 @@ func mustMakeAccessor[T any](obj any, path string) saferefl.Accessor[T] {
 	return acc
 }
 
-// BenchmarkGet_int_L3 — Layer 3: Accessor with pre-extracted unsafe.Pointer (maximum throughput).
-func BenchmarkGet_int_L3(b *testing.B) {
+// BenchmarkGet_int_Accessor — Accessor.Get with pre-extracted pointer (maximum throughput).
+func BenchmarkGet_int_Accessor(b *testing.B) {
 	u := &benchUser{ID: 42}
 	ptr := saferefl.UnsafePtrOf(u)
 	b.ResetTimer()
@@ -111,8 +132,8 @@ func BenchmarkGet_int_L3(b *testing.B) {
 	}
 }
 
-// BenchmarkGet_int_L3From — Layer 3: Accessor.GetFrom (interface convenience path).
-func BenchmarkGet_int_L3From(b *testing.B) {
+// BenchmarkGet_int_AccFrom — Accessor.GetFrom: interface convenience path.
+func BenchmarkGet_int_AccFrom(b *testing.B) {
 	u := &benchUser{ID: 42}
 	b.ResetTimer()
 	for i := range b.N {
@@ -121,8 +142,8 @@ func BenchmarkGet_int_L3From(b *testing.B) {
 	}
 }
 
-// BenchmarkSet_string_L3 — Layer 3: Accessor.Set with pre-extracted pointer.
-func BenchmarkSet_string_L3(b *testing.B) {
+// BenchmarkSet_string_Accessor — Accessor.Set with pre-extracted pointer (maximum throughput).
+func BenchmarkSet_string_Accessor(b *testing.B) {
 	u := &benchUser{}
 	ptr := saferefl.UnsafePtrOf(u)
 	b.ResetTimer()
@@ -132,8 +153,8 @@ func BenchmarkSet_string_L3(b *testing.B) {
 	sinkString = u.Name
 }
 
-// BenchmarkSet_string_L3On — Layer 3: Accessor.SetOn (interface convenience path).
-func BenchmarkSet_string_L3On(b *testing.B) {
+// BenchmarkSet_string_AccOn — Accessor.SetOn: interface convenience path.
+func BenchmarkSet_string_AccOn(b *testing.B) {
 	u := &benchUser{}
 	b.ResetTimer()
 	for range b.N {

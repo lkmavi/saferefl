@@ -1,7 +1,7 @@
 name: CI
 
 # CI strategy (per ADR-01):
-# - Go version matrix: 1.22 (floor), 1.23, 1.24, 1.25, 1.26, stable
+# - Go version matrix: 1.22 (floor, hmap), 1.24 (Swiss Tables), stable
 # - Go tip runs as non-blocking to catch future breaking changes early
 # - Tests run with race detector and all build-tag combinations
 # - Build tags tested: default (safe), unsafe_accel, reflectx_strict
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.22.x', '1.23.x', '1.24.x', '1.25.x', '1.26.x', 'stable']
+        go-version: ['1.22.x', '1.24.x', 'stable']
 
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +82,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ['1.22.x', '1.23.x', '1.24.x', '1.25.x', '1.26.x', 'stable']
+        go-version: ['1.22.x', '1.24.x', 'stable']
 
     steps:
       - uses: actions/checkout@v4
