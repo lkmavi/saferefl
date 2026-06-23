@@ -468,6 +468,72 @@ func TestSet_interfaceField(t *testing.T) {
 	}
 }
 
+// --- Set coverage: missing branches ---
+
+func TestSet_emptyPath(t *testing.T) {
+	p := &person{}
+	if err := saferefl.Set[string](p, "", "x"); err == nil {
+		t.Error("expected error for empty field path")
+	}
+}
+
+func TestSet_nilInterfaceObj(t *testing.T) {
+	if err := saferefl.Set[string](nil, "Name", "x"); err == nil {
+		t.Error("expected error for nil interface obj")
+	}
+}
+
+func TestSet_ptrToNonStruct(t *testing.T) {
+	n := 42
+	if err := saferefl.Set[int](&n, "anything", 1); err == nil {
+		t.Error("expected error for pointer-to-non-struct")
+	}
+}
+
+// nestedPrivate is a fixture for dot-path tests on unexported fields.
+type nestedPrivate struct {
+	secret string //nolint:unused
+	Value  int
+}
+type wrapPrivate struct{ Inner nestedPrivate }
+
+func TestSet_dotpath_readonly(t *testing.T) {
+	w := &wrapPrivate{}
+	err := saferefl.Set[string](w, "Inner.secret", "x")
+	if err == nil {
+		t.Fatal("expected ReadOnlyError via dot-path, got nil")
+	}
+	var roe *saferefl.ReadOnlyError
+	if !errors.As(err, &roe) {
+		t.Errorf("want ReadOnlyError, got %T: %v", err, err)
+	}
+}
+
+func TestSet_dotpath_typeMismatch(t *testing.T) {
+	e := &employee{Office: address{}}
+	err := saferefl.Set[int](e, "Office.City", 42) // City is string
+	if err == nil {
+		t.Fatal("expected TypeMismatchError via dot-path, got nil")
+	}
+	var tme *saferefl.TypeMismatchError
+	if !errors.As(err, &tme) {
+		t.Errorf("want TypeMismatchError, got %T: %v", err, err)
+	}
+}
+
+type innerWithIface struct{ V any }
+type outerWithIface struct{ Inner innerWithIface }
+
+func TestSet_dotpath_interfaceField(t *testing.T) {
+	o := &outerWithIface{}
+	if err := saferefl.Set[string](o, "Inner.V", "hello"); err != nil {
+		t.Fatalf("Set dot-path interface field: %v", err)
+	}
+	if o.Inner.V != "hello" {
+		t.Errorf("Inner.V = %v, want hello", o.Inner.V)
+	}
+}
+
 // --- Fuzz ---
 
 func FuzzGet(f *testing.F) {
