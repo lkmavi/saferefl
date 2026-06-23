@@ -111,3 +111,30 @@ func TestMapLen_matches_builtin(t *testing.T) {
 		}
 	}
 }
+
+func FuzzUnsafeFieldPtr(f *testing.F) {
+	type sample struct {
+		A int64
+		B string
+		C float64
+		D bool
+		E uint32
+	}
+	rt := reflect.TypeOf(sample{})
+	for i := 0; i < rt.NumField(); i++ {
+		f.Add(i)
+	}
+	f.Fuzz(func(t *testing.T, fieldIdx int) {
+		if fieldIdx < 0 || fieldIdx >= rt.NumField() {
+			return
+		}
+		sf := rt.Field(fieldIdx)
+		s := sample{A: 0xDEAD, B: "test", C: 3.14, D: true, E: 42}
+		ptr := unsafe.Pointer(&s)
+		got := UnsafeFieldPtr(ptr, sf.Offset)
+		want := unsafe.Pointer(reflect.ValueOf(&s).Elem().Field(fieldIdx).UnsafeAddr())
+		if got != want {
+			t.Errorf("field %q: got %p, want %p", sf.Name, got, want)
+		}
+	})
+}

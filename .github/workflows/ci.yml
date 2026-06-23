@@ -165,6 +165,43 @@ jobs:
           version: latest
           args: --timeout=5m
 
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - run: go mod download
+
+      - name: Fuzz Get (60s)
+        run: go test . -fuzz=FuzzGet -fuzztime=60s
+
+      - name: Fuzz UnsafeFieldPtr (60s)
+        run: go test ./internal/unsafelayout/ -fuzz=FuzzUnsafeFieldPtr -fuzztime=60s
+
+  consistency:
+    name: Consistency (L2 vs L3)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - run: go mod download
+
+      - name: Consistency tests with race detector
+        run: go test ./... -run TestConsistency -race -v
+
   formatting:
     name: Formatting
     runs-on: ubuntu-latest
