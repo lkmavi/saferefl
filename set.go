@@ -45,7 +45,7 @@ func Set[T any](obj any, fieldPath string, val T) error {
 // setWithDesc resolves fieldPath against desc and writes val.
 func setWithDesc[T any](objPtr unsafe.Pointer, desc *typeinfo.TypeDescriptor, fieldPath string, wantType reflect.Type, val T) error {
 	// Fast path: single-segment field (no dot) — skip resolvePath entirely.
-	if strings.IndexByte(fieldPath, '.') < 0 {
+	if strings.IndexByte(fieldPath, '.') < 0 { //nolint:nestif
 		fm, ok := desc.FieldsByName[fieldPath]
 		if !ok {
 			return &FieldNotFoundError{Type: desc.Type.String(), FieldPath: fieldPath}

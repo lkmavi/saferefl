@@ -134,7 +134,7 @@ func TestBuildDescriptor_tags(t *testing.T) {
 }
 
 func TestBuildDescriptor_unexportedField(t *testing.T) {
-	rt := reflect.TypeOf(taggedStruct{})
+	rt := reflect.TypeOf(taggedStruct{score: 1.0})
 	desc := buildDescriptor(rt)
 
 	// Unexported fields appear in FieldsByName with Exported=false.

@@ -12,5 +12,5 @@ func MapLenFast[K comparable, V any](m map[K]V) int {
 	if m == nil {
 		return 0
 	}
-	return int(*(*uint64)(*(*unsafe.Pointer)(unsafe.Pointer(&m))))
+	return int(*(*uint64)(*(*unsafe.Pointer)(unsafe.Pointer(&m)))) //nolint:gosec
 }

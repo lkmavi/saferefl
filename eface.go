@@ -31,7 +31,7 @@ func efaceKind(typ unsafe.Pointer) reflect.Kind {
 	//   FieldAlign_ uint8    (22)
 	//   Kind_       uint8    (23) ← this field
 	const kindOffset = 23
-	return reflect.Kind(*(*uint8)(unsafe.Pointer(uintptr(typ) + kindOffset)) & 0x1f)
+	return reflect.Kind(*(*uint8)(unsafe.Pointer(uintptr(typ) + kindOffset)) & 0x1f) //nolint:gosec
 }
 
 // fromError builds a descriptive error for GetFrom/SetOn misuse.

@@ -30,6 +30,6 @@ func EnableAccel() error {
 // This is strictly faster than bounds-checked &s[index] when the caller can prove
 // safety externally.
 func UnsafeSliceAt[T any](s []T, index int) *T {
-	data := *(*unsafe.Pointer)(unsafe.Pointer(&s))
+	data := *(*unsafe.Pointer)(unsafe.Pointer(&s)) //nolint:gosec
 	return (*T)(unsafe.Add(data, uintptr(index)*unsafe.Sizeof(*new(T))))
 }
