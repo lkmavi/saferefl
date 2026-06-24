@@ -300,4 +300,4 @@ go run ./examples/fields/
 
 ## Go version support
 
-Floor: **Go 1.22**. CI matrix: 1.22, 1.23, 1.24, 1.25, 1.26, stable, tip.
+Floor: **Go 1.22**. CI matrix: 1.22 (hmap backend), 1.24 (Swiss Tables backend), stable. Go tip runs weekly as a non-blocking early-warning job.

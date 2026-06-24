@@ -202,6 +202,74 @@ jobs:
       - name: Consistency tests with race detector
         run: go test ./... -run TestConsistency -race -v
 
+  # Validates the portable kindOffset constant on 32-bit architectures.
+  # linux/386 runs natively on the amd64 host (no QEMU needed).
+  # linux/arm uses qemu-user-static via binfmt_misc.
+  # Race detector is omitted because CGO is disabled for cross-arch builds.
+  test-32bit:
+    name: Test (32-bit ${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        goarch: ['386', 'arm']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Install QEMU (arm only)
+        if: matrix.goarch == 'arm'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y qemu-user-static
+
+      - name: Register binfmt_misc handlers (arm only)
+        if: matrix.goarch == 'arm'
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - run: go mod download
+
+      - name: Build (${{ matrix.goarch }})
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          GOARM: "7"
+        run: go build ./...
+
+      - name: Test (${{ matrix.goarch }})
+        env:
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          GOARM: "7"
+          SAFEREFL_STRICT: "1"
+        run: go test -count=1 ./...
+
+  # Native arm64 run — validates on Apple Silicon layout.
+  test-arm64:
+    name: Test (macOS arm64)
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - run: go mod download
+
+      - name: Tests with race detector (arm64)
+        env:
+          SAFEREFL_STRICT: "1"
+        run: go test -race -count=1 ./...
+
   formatting:
     name: Formatting
     runs-on: ubuntu-latest
