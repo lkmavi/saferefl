@@ -104,6 +104,27 @@ func TestTypeDescriptorOf_promoted_offsets(t *testing.T) {
 	}
 }
 
+// TestTypeDescriptorOf_unexportedTagNotInFieldsByTag verifies that fix 5 excludes
+// unexported fields from FieldsByTag, preventing GetByTag from reading private data.
+func TestTypeDescriptorOf_unexportedTagNotInFieldsByTag(t *testing.T) {
+	type hasPrivateTag struct {
+		Pub  string `json:"pub" db:"pub_col"`
+		priv string `db:"priv_col"` //nolint:unused
+	}
+	desc := saferefl.TypeDescriptorOf(reflect.TypeOf(hasPrivateTag{}))
+
+	dbTags := desc.FieldsByTag["db"]
+	if dbTags == nil {
+		t.Fatal("FieldsByTag missing db")
+	}
+	if _, found := dbTags["priv_col"]; found {
+		t.Error("unexported field 'priv' must not appear in FieldsByTag")
+	}
+	if _, found := dbTags["pub_col"]; !found {
+		t.Error("exported field 'pub' must appear in FieldsByTag")
+	}
+}
+
 func TestTypeDescriptorOf_panicOnNonStruct(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {

@@ -15,6 +15,10 @@ type TypeDescriptor = typeinfo.TypeDescriptor
 // Offset is always relative to the root struct, even for promoted fields.
 type FieldMeta = typeinfo.FieldMeta
 
+// IterEntry describes one exported field in the pre-computed flat iteration plan.
+// See [TypeDescriptor.IterPlan].
+type IterEntry = typeinfo.IterEntry
+
 // TypeDescriptorOf returns the precomputed [TypeDescriptor] for t.
 // Panics if t is not a struct type.
 // The descriptor is built at most once per type and cached globally.

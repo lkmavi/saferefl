@@ -100,54 +100,64 @@ func isIfaceDirect(abiType unsafe.Pointer) bool {
 // Called once per type inside buildDescriptor.
 func buildIterPlan(t reflect.Type) []IterEntry {
 	var entries []IterEntry
-	collectIter(t, 0, nil, &entries)
+	seen := make(map[string]struct{})
+	collectIter(t, 0, nil, seen, &entries)
 	return entries
 }
 
 // collectIter recursively walks t's fields, accumulating baseOffset for value-embedded
 // structs (same chain) and appending to chain for pointer-embedded structs (new chain entry,
 // reset baseOffset to 0).
-func collectIter(t reflect.Type, base uintptr, chain []uintptr, out *[]IterEntry) {
-	for i := range t.NumField() {
+//
+// Two-pass per level: direct fields are emitted and name-claimed in pass 1, then embedded
+// structs are recursed in pass 2. This ensures outer fields always shadow promoted fields
+// of the same name, matching Go's promotion rules.
+func collectIter(t reflect.Type, base uintptr, chain []uintptr, seen map[string]struct{}, out *[]IterEntry) {
+	n := t.NumField()
+	var ch []uintptr
+	if len(chain) > 0 {
+		ch = chain
+	}
+	// Pass 1: emit direct (non-anonymous) exported fields and pre-claim their names.
+	for i := range n {
 		sf := t.Field(i)
-		off := base + sf.Offset
-
-		if sf.Anonymous {
-			k := sf.Type.Kind()
-			if k == reflect.Struct {
-				// Value-embedded: flatten with accumulated offset, same chain.
-				collectIter(sf.Type, off, chain, out)
-				continue
-			}
-			if k == reflect.Pointer && sf.Type.Elem().Kind() == reflect.Struct {
-				// Pointer-embedded: the pointer itself (at offset off) is the next chain step.
-				// Fields inside the pointed-to struct are relative to that struct (base resets to 0).
-				newChain := make([]uintptr, len(chain)+1)
-				copy(newChain, chain)
-				newChain[len(chain)] = off
-				collectIter(sf.Type.Elem(), 0, newChain, out)
-				continue
-			}
-		}
-
-		if !sf.IsExported() {
+		if sf.Anonymous || !sf.IsExported() {
 			continue
 		}
-
-		abiType := abiTypeOf(sf.Type)
-
-		// Share the chain slice for all entries at the same embedding depth.
-		var ch []uintptr
-		if len(chain) > 0 {
-			ch = chain
+		if _, dup := seen[sf.Name]; dup {
+			continue
 		}
+		seen[sf.Name] = struct{}{}
+		off := base + sf.Offset
+		abiType := abiTypeOf(sf.Type)
 		*out = append(*out, IterEntry{
 			Name:        sf.Name,
 			Tag:         sf.Tag,
+			Type:        sf.Type,
 			AbiType:     abiType,
 			IfaceDirect: isIfaceDirect(abiType),
 			Offset:      off,
 			EmbedChain:  ch,
 		})
+	}
+	// Pass 2: recurse into anonymous (embedded) fields.
+	for i := range n {
+		sf := t.Field(i)
+		if !sf.Anonymous {
+			continue
+		}
+		off := base + sf.Offset
+		k := sf.Type.Kind()
+		if k == reflect.Struct {
+			// Value-embedded: flatten with accumulated offset, same chain.
+			collectIter(sf.Type, off, chain, seen, out)
+		} else if k == reflect.Pointer && sf.Type.Elem().Kind() == reflect.Struct {
+			// Pointer-embedded: the pointer itself (at offset off) is the next chain step.
+			// Fields inside the pointed-to struct are relative to that struct (base resets to 0).
+			newChain := make([]uintptr, len(chain)+1)
+			copy(newChain, chain)
+			newChain[len(chain)] = off
+			collectIter(sf.Type.Elem(), 0, newChain, seen, out)
+		}
 	}
 }

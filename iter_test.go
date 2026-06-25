@@ -228,6 +228,27 @@ func TestEachField_fallback_ptrEmbedNonNilUnexported(t *testing.T) {
 	}
 }
 
+func TestEachField_interfaceTypedField(t *testing.T) {
+	// Covers the efaceKind==Interface branch in fieldAny (fix 3):
+	// interface-typed struct fields must not produce nested any-in-any.
+	type withIface struct {
+		Val any
+		Num int
+	}
+	s := &withIface{Val: 42, Num: 7}
+	got := map[string]any{}
+	_ = saferefl.EachField(s, func(name string, val any) bool {
+		got[name] = val
+		return true
+	})
+	if got["Val"] != 42 {
+		t.Errorf("Val = %v (%T), want 42 (int)", got["Val"], got["Val"])
+	}
+	if got["Num"] != 7 {
+		t.Errorf("Num = %v, want 7", got["Num"])
+	}
+}
+
 func TestMapForEach_nilMap(t *testing.T) {
 	var m map[string]int
 	count := 0
