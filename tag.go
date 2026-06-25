@@ -43,7 +43,11 @@ func getByTagWithDesc[T any](objPtr unsafe.Pointer, desc *typeinfo.TypeDescripto
 	if fm.Type == wantType {
 		return *(*T)(fieldPtr), nil
 	}
-	return reflect.NewAt(fm.Type, fieldPtr).Elem().Interface().(T), nil
+	val, ok := reflect.NewAt(fm.Type, fieldPtr).Elem().Interface().(T)
+	if !ok {
+		return zero, &TypeMismatchError{FieldPath: tagPath(tagKey, tagValue), FieldType: fm.Type.String(), WantType: wantType.String()}
+	}
+	return val, nil
 }
 
 //go:noinline

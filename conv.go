@@ -54,22 +54,12 @@ func ToMapByTag(obj any, tagKey string) (map[string]any, error) {
 func flatToMap(objPtr unsafe.Pointer, plan []typeinfo.IterEntry, out map[string]any) {
 	for i := range plan {
 		e := &plan[i]
-		base := objPtr
-
-		skipped := false
-		for _, chainOff := range e.EmbedChain {
-			base = *(*unsafe.Pointer)(unsafe.Pointer(uintptr(base) + chainOff)) //nolint:gosec
-			if base == nil {
-				skipped = true
-				break
-			}
-		}
-		if skipped {
+		base, ok := resolveBase(objPtr, e.EmbedChain)
+		if !ok {
 			continue
 		}
-
 		fieldPtr := unsafe.Pointer(uintptr(base) + e.Offset) //nolint:gosec
-		out[e.Name] = fieldAny(e.AbiType, e.IfaceDirect, fieldPtr)
+		out[e.Name] = fieldAny(e, fieldPtr)
 	}
 }
 
@@ -88,21 +78,13 @@ func flatToMapByTag(objPtr unsafe.Pointer, plan []typeinfo.IterEntry, tagKey str
 			continue
 		}
 
-		base := objPtr
-		skipped := false
-		for _, chainOff := range e.EmbedChain {
-			base = *(*unsafe.Pointer)(unsafe.Pointer(uintptr(base) + chainOff)) //nolint:gosec
-			if base == nil {
-				skipped = true
-				break
-			}
-		}
-		if skipped {
+		base, ok := resolveBase(objPtr, e.EmbedChain)
+		if !ok {
 			continue
 		}
 
 		fieldPtr := unsafe.Pointer(uintptr(base) + e.Offset) //nolint:gosec
-		out[key] = fieldAny(e.AbiType, e.IfaceDirect, fieldPtr)
+		out[key] = fieldAny(e, fieldPtr)
 	}
 }
 
@@ -153,25 +135,61 @@ func toMapByTagRec(objPtr unsafe.Pointer, desc *typeinfo.TypeDescriptor, baseOff
 // useful after JSON unmarshaling into map[string]any). Returns [TypeMismatchError] if a
 // matching field exists but the value is neither assignable nor convertible.
 // dst must be a non-nil pointer to a struct.
+//
+// Fields promoted from pointer-embedded structs (e.g. type Outer struct{ *Inner }) are
+// included when the embedded pointer is non-nil; if the pointer is nil those fields are
+// silently skipped.
 func FromMap(m map[string]any, dst any) error {
 	desc, dstPtr, err := structPtrOf(dst)
 	if err != nil {
 		return err
 	}
-
+	// IterPlanIndex covers all promoted fields including pointer-embedded ones.
+	// Fall back to FieldsByName in reflectx_strict or all-unexported structs.
+	if desc.IterPlanIndex == nil {
+		return fromMapFallback(m, dstPtr, desc)
+	}
 	for key, val := range m {
+		if val == nil {
+			continue
+		}
+		idx, ok := desc.IterPlanIndex[key]
+		if !ok {
+			continue
+		}
+		e := &desc.IterPlan[idx]
+		base, baseOK := resolveBase(dstPtr, e.EmbedChain)
+		if !baseOK {
+			continue
+		}
+		fieldPtr := unsafe.Pointer(uintptr(base) + e.Offset) //nolint:gosec
+		dstField := reflect.NewAt(e.Type, fieldPtr).Elem()
+		srcVal := reflect.ValueOf(val)
+		if srcVal.Type().AssignableTo(e.Type) {
+			dstField.Set(srcVal)
+			continue
+		}
+		if srcVal.Type().ConvertibleTo(e.Type) {
+			dstField.Set(srcVal.Convert(e.Type))
+			continue
+		}
+		return &TypeMismatchError{FieldPath: key, FieldType: e.Type.String(), WantType: srcVal.Type().String()}
+	}
+	return nil
+}
+
+func fromMapFallback(m map[string]any, dstPtr unsafe.Pointer, desc *typeinfo.TypeDescriptor) error {
+	for key, val := range m {
+		if val == nil {
+			continue
+		}
 		fm, ok := desc.FieldsByName[key]
 		if !ok || !fm.Exported {
 			continue
 		}
-		if val == nil {
-			continue
-		}
-
 		srcVal := reflect.ValueOf(val)
 		dstFieldPtr := unsafe.Pointer(uintptr(dstPtr) + fm.Offset) //nolint:gosec
 		dstField := reflect.NewAt(fm.Type, dstFieldPtr).Elem()
-
 		if srcVal.Type().AssignableTo(fm.Type) {
 			dstField.Set(srcVal)
 			continue
@@ -180,11 +198,7 @@ func FromMap(m map[string]any, dst any) error {
 			dstField.Set(srcVal.Convert(fm.Type))
 			continue
 		}
-		return &TypeMismatchError{
-			FieldPath: key,
-			FieldType: fm.Type.String(),
-			WantType:  srcVal.Type().String(),
-		}
+		return &TypeMismatchError{FieldPath: key, FieldType: fm.Type.String(), WantType: srcVal.Type().String()}
 	}
 	return nil
 }

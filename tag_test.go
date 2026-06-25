@@ -121,13 +121,15 @@ func TestSetByTag_alternate_key(t *testing.T) {
 }
 
 func TestSetByTag_readonly(t *testing.T) {
+	// Unexported fields are excluded from FieldsByTag (fix 5), so they appear
+	// as "not found" rather than "read-only" — prevents GetByTag from reading them too.
 	u := &tagged{}
 	err := saferefl.SetByTag[string](u, "db", "priv", "x")
 	if err == nil {
-		t.Fatal("expected ReadOnlyError, got nil")
+		t.Fatal("expected FieldNotFoundError, got nil")
 	}
-	if !errors.Is(err, saferefl.ErrReadOnly) {
-		t.Errorf("expected ErrReadOnly, got %T: %v", err, err)
+	if !errors.Is(err, saferefl.ErrFieldNotFound) {
+		t.Errorf("expected ErrFieldNotFound, got %T: %v", err, err)
 	}
 }
 

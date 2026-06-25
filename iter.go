@@ -29,29 +29,32 @@ func EachField(obj any, fn func(name string, val any) bool) error {
 	return nil
 }
 
+// resolveBase follows the EmbedChain for an IterEntry from objPtr, returning the
+// base pointer from which e.Offset should be applied.
+// Returns nil, false if any pointer step in the chain is nil (nil embedded pointer).
+func resolveBase(objPtr unsafe.Pointer, chain []uintptr) (unsafe.Pointer, bool) {
+	base := objPtr
+	for _, chainOff := range chain {
+		base = *(*unsafe.Pointer)(unsafe.Pointer(uintptr(base) + chainOff)) //nolint:gosec
+		if base == nil {
+			return nil, false
+		}
+	}
+	return base, true
+}
+
 // iterFlat is the fast path for EachField/ToMap: walks the pre-computed IterPlan
 // in order, following EmbedChain pointer-deref steps per entry when needed.
 // Returns false if fn stopped early, true otherwise.
 func iterFlat(objPtr unsafe.Pointer, plan []typeinfo.IterEntry, fn func(string, any) bool) bool {
 	for i := range plan {
 		e := &plan[i]
-		base := objPtr
-
-		// Follow the chain of embedded *Struct pointer fields (usually 0 steps).
-		skipped := false
-		for _, chainOff := range e.EmbedChain {
-			base = *(*unsafe.Pointer)(unsafe.Pointer(uintptr(base) + chainOff)) //nolint:gosec
-			if base == nil {
-				skipped = true
-				break
-			}
-		}
-		if skipped {
+		base, ok := resolveBase(objPtr, e.EmbedChain)
+		if !ok {
 			continue
 		}
-
 		fieldPtr := unsafe.Pointer(uintptr(base) + e.Offset) //nolint:gosec
-		if !fn(e.Name, fieldAny(e.AbiType, e.IfaceDirect, fieldPtr)) {
+		if !fn(e.Name, fieldAny(e, fieldPtr)) {
 			return false
 		}
 	}

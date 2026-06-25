@@ -88,37 +88,58 @@ func buildDescriptor(t reflect.Type) *TypeDescriptor {
 	}
 	collectNamed(desc, t, 0)
 	desc.IterPlan = buildIterPlan(t)
+	desc.IterPlanIndex = buildIterPlanIndex(desc.IterPlan)
 	return desc
 }
 
 // collectNamed populates FieldsByName and FieldsByTag, recursing into embedded structs.
 // baseOffset accumulates the byte offset from the root struct.
-// Outer fields shadow inner promoted fields (first write wins).
+// Outer fields shadow inner promoted fields (Go promotion rules): two-pass ensures all
+// fields at the current depth are registered before recursion into embedded structs.
 func collectNamed(desc *TypeDescriptor, t reflect.Type, baseOffset uintptr) {
 	n := t.NumField()
+	// Pass 1: register all fields at this level — outer fields shadow promoted ones.
 	for i := range n {
 		sf := t.Field(i)
+		if _, exists := desc.FieldsByName[sf.Name]; exists {
+			continue
+		}
 		offset := baseOffset + sf.Offset
-
-		if _, exists := desc.FieldsByName[sf.Name]; !exists {
-			fm := &FieldMeta{
-				Name:      sf.Name,
-				Index:     i,
-				Offset:    offset,
-				Type:      sf.Type,
-				Kind:      sf.Type.Kind(),
-				Tag:       sf.Tag,
-				Anonymous: sf.Anonymous,
-				Exported:  sf.IsExported(),
-			}
-			desc.FieldsByName[sf.Name] = fm
+		fm := &FieldMeta{
+			Name:      sf.Name,
+			Index:     i,
+			Offset:    offset,
+			Type:      sf.Type,
+			Kind:      sf.Type.Kind(),
+			Tag:       sf.Tag,
+			Anonymous: sf.Anonymous,
+			Exported:  sf.IsExported(),
+		}
+		desc.FieldsByName[sf.Name] = fm
+		// Only exported fields participate in tag-based lookup.
+		if fm.Exported {
 			addTagEntries(desc, fm)
 		}
-
+	}
+	// Pass 2: recurse into anonymous value-embedded structs (promoted fields).
+	for i := range n {
+		sf := t.Field(i)
 		if sf.Anonymous && sf.Type.Kind() == reflect.Struct {
-			collectNamed(desc, sf.Type, offset)
+			collectNamed(desc, sf.Type, baseOffset+sf.Offset)
 		}
 	}
+}
+
+// buildIterPlanIndex builds the name→index map for O(1) IterPlan lookups in FromMap.
+func buildIterPlanIndex(plan []IterEntry) map[string]int {
+	if len(plan) == 0 {
+		return nil
+	}
+	m := make(map[string]int, len(plan))
+	for i, e := range plan {
+		m[e.Name] = i
+	}
+	return m
 }
 
 // addTagEntries parses the struct tag and adds key→name→field entries to FieldsByTag.

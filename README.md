@@ -59,6 +59,102 @@ age, _ = ageAcc.GetFrom(u)    // 1.4 ns — eface extraction + field read
 _ = ageAcc.SetOn(u, 31)       // 1.9 ns
 ```
 
+## General-purpose API
+
+Higher-level functions for struct iteration, mapping, and tag-based access. All use the prebuilt `IterPlan` cache — zero allocs on the hot path, embedded structs flattened automatically, nil pointer embeds skipped.
+
+### Field iteration
+
+```go
+type Article struct {
+    Title  string
+    Author string
+    Views  int
+}
+
+a := &Article{Title: "Go internals", Author: "Alice", Views: 1200}
+
+// Iterate all exported fields in declaration order; return false to stop early.
+_ = saferefl.EachField(a, func(name string, val any) bool {
+    fmt.Printf("%s = %v\n", name, val)
+    return true
+})
+// Title = Go internals
+// Author = Alice
+// Views = 1200
+```
+
+### Struct copying
+
+```go
+type Src struct { Name string; Score float64 }
+type Dst struct { Name string; Score float64; Extra int }
+
+src := &Src{Name: "Alice", Score: 9.5}
+dst := &Dst{}
+
+_ = saferefl.CopyFields(src, dst)
+// dst.Name == "Alice", dst.Score == 9.5, dst.Extra == 0 (no matching field)
+```
+
+`CopyFields` uses `AssignableTo` first, then `ConvertibleTo` for compatible-but-different types (e.g. `float32` → `float64`). Unmatched and incompatible fields are silently skipped.
+
+### Struct ↔ map
+
+```go
+// Struct → map (field names as keys)
+m, _ := saferefl.ToMap(a)       // map["Title":"Go internals" "Author":"Alice" "Views":1200]
+
+// Struct → map (tag values as keys; skips "-" and empty tag names; strips omitempty)
+type Tagged struct {
+    Name  string `json:"name"`
+    Score float64 `json:"score,omitempty"`
+    Skip  string  `json:"-"`
+}
+t := &Tagged{Name: "Bob", Score: 8.0}
+m, _ = saferefl.ToMapByTag(t, "json")   // map["name":"Bob" "score":8.0]
+
+// Map → struct (tries AssignableTo, then ConvertibleTo; skips unknown keys and nil values)
+dst2 := &Tagged{}
+_ = saferefl.FromMap(map[string]any{"Name": "Carol", "Score": float64(7.5)}, dst2)
+```
+
+### Tag-based field access
+
+```go
+type Record struct {
+    ID   int    `db:"id"`
+    Name string `db:"name"`
+}
+
+r := &Record{ID: 1, Name: "Alice"}
+
+id, err := saferefl.GetByTag[int](r, "db", "id")       // 1, nil
+_ = saferefl.SetByTag[string](r, "db", "name", "Bob")  // r.Name == "Bob"
+```
+
+Sentinel errors work with `errors.Is`:
+
+```go
+_, err = saferefl.GetByTag[int](r, "db", "missing")
+errors.Is(err, saferefl.ErrFieldNotFound) // true
+```
+
+### Map and kind utilities
+
+```go
+// Typed map iteration — identical speed to plain range, early-stop on false
+saferefl.MapForEach(map[string]int{"a": 1, "b": 2}, func(k string, v int) bool {
+    fmt.Println(k, v)
+    return true
+})
+
+// Fast kind/nil checks via raw abi.Type read (~0.28 ns, 0 allocs)
+saferefl.KindOf("hello")  // reflect.String
+saferefl.KindOf(42)       // reflect.Int
+saferefl.IsNil((*int)(nil)) // true
+```
+
 ### Dot-path traversal
 
 Intermediate struct fields and pointer-to-struct fields are transparently traversed:
@@ -109,13 +205,13 @@ sf, ok := saferefl.FieldByName[User]("Name")
 
 ## Error types
 
-All errors are typed and work with `errors.As`:
+All errors are typed and work with `errors.Is` / `errors.As`:
 
-| Type | When |
-|---|---|
-| `*FieldNotFoundError` | field path does not exist on the type |
-| `*TypeMismatchError` | field type is not assignable to T |
-| `*ReadOnlyError` | attempted to Set an unexported field |
+| Sentinel | Type | When |
+|---|---|---|
+| `ErrFieldNotFound` | `*FieldNotFoundError` | field path or tag value does not exist |
+| `ErrTypeMismatch` | `*TypeMismatchError` | field type is not assignable/convertible to T |
+| `ErrReadOnly` | `*ReadOnlyError` | attempted to write an unexported field |
 
 ```go
 _, err := saferefl.Get[int](u, "Name")   // Name is string, not int
@@ -130,15 +226,21 @@ if errors.As(err, &tme) {
 
 ```
 ┌──────────────────────────────────────────────────────────┐
+│  General-purpose API                                      │
+│  EachField · CopyFields · ToMap · ToMapByTag · FromMap    │
+│  GetByTag[T] · SetByTag[T] · MapForEach · KindOf · IsNil │
+│  - embedded structs flattened; nil pointer embeds skipped │
+│  - zero allocs on warm cache (IterPlan fast path)         │
+├──────────────────────────────────────────────────────────┤
 │  Generic API                                              │
 │  Get[T], Set[T], MustGet[T], MustSet[T]                  │
-│  Fields, FieldsOf[T], FieldByName[T]                     │
+│  Fields, FieldsOf[T], FieldByName[T]                      │
 │  - type-safe by construction, zero allocs on warm cache  │
 │  - dot-path traversal through nested / pointer structs    │
 ├──────────────────────────────────────────────────────────┤
 │  TypeInfo Cache                       (internal)          │
-│  TypeDescriptorOf · sync.Map · atomic.Pointer            │
-│  - struct metadata built once via stdlib reflect          │
+│  TypeDescriptorOf · IterPlan · sync.Map · atomic.Pointer  │
+│  - struct metadata + flat IterPlan built once via reflect │
 │  - zero-alloc reads after the first call per type         │
 ├──────────────────────────────────────────────────────────┤
 │  Accessor API + Unsafe Primitives                         │
@@ -280,22 +382,32 @@ make bench-docker-1.24   # single version
 
 | Layer | Status | Description |
 |---|---|---|
-| TypeInfo Cache | ✅ Done | `internal/typeinfo`: struct metadata, `sync.Map` + `atomic.Pointer` cache, direct pointer arithmetic |
+| TypeInfo Cache | ✅ Done | `internal/typeinfo`: struct metadata + flat `IterPlan`, `sync.Map` + `atomic.Pointer` cache |
 | Generic API | ✅ Done | `Get[T]`, `Set[T]`, `MustGet[T]`, `MustSet[T]`, dot-path, `FieldByName[T]`, `Fields`, `FieldsOf[T]` |
-| Accessor API + Unsafe Primitives | ✅ Done | `Accessor[T]`, `UnsafeSliceAt[T]`, `MapLenFast` — `internal/unsafelayout`: self-test at init, hmap/Swiss Tables backends |
+| Accessor API + Unsafe Primitives | ✅ Done | `Accessor[T]`, `UnsafeSliceAt[T]`, `MapLenFast` — self-test at init, hmap/Swiss Tables backends |
+| General-purpose API | ✅ Done | `EachField`, `CopyFields`, `ToMap`, `ToMapByTag`, `FromMap`, `GetByTag[T]`, `SetByTag[T]`, `MapForEach`, `KindOf`, `IsNil` |
 
 ## Examples
 
 Runnable examples are in [`examples/`](examples/):
 
-- [`examples/basic/`](examples/basic/) — Get/Set primitive fields
-- [`examples/dotpath/`](examples/dotpath/) — dot-path traversal through nested structs
-- [`examples/fields/`](examples/fields/) — field inspection without an instance
+| Directory | Demonstrates |
+|---|---|
+| [`examples/basic/`](examples/basic/) | `Get`/`Set` primitive fields |
+| [`examples/dotpath/`](examples/dotpath/) | dot-path traversal through nested structs |
+| [`examples/fields/`](examples/fields/) | field inspection without an instance |
+| [`examples/accessor/`](examples/accessor/) | `Accessor[T]` hot-path pre-binding |
+| [`examples/primitives/`](examples/primitives/) | `MapLenFast`, `UnsafeSliceAt` |
+| [`examples/iteration/`](examples/iteration/) | `EachField`, `MapForEach` |
+| [`examples/mapping/`](examples/mapping/) | `ToMap`, `ToMapByTag`, `FromMap` |
+| [`examples/copyfields/`](examples/copyfields/) | `CopyFields` |
+| [`examples/tags/`](examples/tags/) | `GetByTag`, `SetByTag` |
+| [`examples/introspect/`](examples/introspect/) | `KindOf`, `IsNil` |
 
 ```
-go run ./examples/basic/
-go run ./examples/dotpath/
-go run ./examples/fields/
+go run ./examples/iteration/
+go run ./examples/mapping/
+go run ./examples/tags/
 ```
 
 ## Go version support
