@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	reflect2 "github.com/modern-go/reflect2"
 	"github.com/lkmavi/saferefl"
+	reflect2 "github.com/modern-go/reflect2"
 )
 
 // Benchmark struct with 5 exported fields — representative for DTO mapping.
@@ -36,9 +36,9 @@ type userTagged struct {
 }
 
 var (
-	sinkMap    map[string]any
-	sinkBool   bool
-	sinkKind   reflect.Kind
+	sinkMap  map[string]any
+	sinkBool bool
+	sinkKind reflect.Kind
 )
 
 // ── KindOf ──────────────────────────────────────────────────────────────────

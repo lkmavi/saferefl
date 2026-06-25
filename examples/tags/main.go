@@ -15,15 +15,15 @@ type Product struct {
 	Name     string  `json:"name"      db:"product_name"`
 	Price    float64 `json:"price"     db:"unit_price"`
 	InStock  bool    `json:"in_stock"  db:"in_stock"`
-	Internal string  `json:"-"`        // excluded from json tag lookup
+	Internal string  `json:"-"` // excluded from json tag lookup
 }
 
 func main() {
 	p := &Product{
-		ID:      7,
-		Name:    "Widget Pro",
-		Price:   29.99,
-		InStock: true,
+		ID:       7,
+		Name:     "Widget Pro",
+		Price:    29.99,
+		InStock:  true,
 		Internal: "hidden",
 	}
 

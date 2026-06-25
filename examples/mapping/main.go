@@ -21,11 +21,12 @@ type Article struct {
 
 func main() {
 	a := &Article{
-		ID:     101,
-		Title:  "Go Internals",
-		Author: "Alice",
-		Score:  9.2,
-		Draft:  false,
+		ID:      101,
+		Title:   "Go Internals",
+		Author:  "Alice",
+		Score:   9.2,
+		Draft:   false,
+		private: "hidden",
 	}
 
 	// --- ToMap: field names as keys ---

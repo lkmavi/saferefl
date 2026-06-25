@@ -64,7 +64,7 @@ func main() {
 		Country string
 	}
 	type Conference struct {
-		Location             // value-embedded: City and Country are promoted
+		Location // value-embedded: City and Country are promoted
 		Name     string
 		Year     int
 	}

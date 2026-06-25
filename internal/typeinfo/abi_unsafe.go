@@ -46,9 +46,9 @@ func init() {
 	// Verify abiTypeOf: boxing (*int)(nil) as any produces an eface whose _typ
 	// we can extract both via our iface cast and by boxing through reflect.
 	var xptr *int
-	iface := (any)(xptr)
+	iface := any(xptr)
 	type efaceWords struct{ _typ, data unsafe.Pointer }
-	e := (*efaceWords)(unsafe.Pointer(&iface))
+	e := (*efaceWords)(unsafe.Pointer(&iface)) //nolint:gosec
 	if got := abiTypeOf(reflect.TypeOf(xptr)); got != e._typ {
 		fail("[saferefl/typeinfo] abiTypeOf self-test FAILED — reflect.Type iface layout changed")
 	}
@@ -91,9 +91,8 @@ func abiTypeOf(t reflect.Type) unsafe.Pointer {
 //
 // OR-ing both bytes makes the check version-agnostic across the supported range (1.22+).
 func isIfaceDirect(abiType unsafe.Pointer) bool {
-	base := uintptr(abiType)
-	tflag := *(*uint8)(unsafe.Pointer(base + abiFlagOffset)) //nolint:gosec
-	kind  := *(*uint8)(unsafe.Pointer(base + abiKindOffset)) //nolint:gosec
+	tflag := *(*uint8)(unsafe.Add(abiType, abiFlagOffset))
+	kind := *(*uint8)(unsafe.Add(abiType, abiKindOffset))
 	return (tflag|kind)&directIfaceMask != 0
 }
 

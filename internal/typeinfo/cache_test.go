@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestPtrCacheLoadMiss(t *testing.T) {
+	// Key 1 is never stored by any real code (abi.Type pointers are never that small).
+	const key = uintptr(1)
+	if _, ok := PtrCacheLoad(key); ok {
+		t.Error("expected cache miss for synthetic key")
+	}
+}
+
+func TestPtrCacheLoadStore(t *testing.T) {
+	desc := TypeDescriptorOf(reflect.TypeOf(basicStruct{}))
+	const key = uintptr(2) // synthetic key, never a real abi.Type address
+	PtrCacheStore(key, desc)
+	got, ok := PtrCacheLoad(key)
+	if !ok {
+		t.Fatal("expected cache hit after store")
+	}
+	if got != desc {
+		t.Error("PtrCacheLoad returned wrong descriptor")
+	}
+}
+
 func TestTypeDescriptorOf_panicsOnNonStruct(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {

@@ -19,7 +19,7 @@ func describe(label string, v any) {
 		label, saferefl.KindOf(v), saferefl.IsNil(v))
 }
 
-func main() {
+func main() { //nolint:funlen
 	var nilPtr *Config
 	var nilMap map[string]int
 	var nilChan chan int

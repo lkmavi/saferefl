@@ -32,9 +32,9 @@ func fieldAny(abiType unsafe.Pointer, ifaceDirect bool, fieldPtr unsafe.Pointer)
 	var e eface
 	e._typ = abiType
 	if ifaceDirect {
-		e.data = *(*unsafe.Pointer)(fieldPtr) //nolint:gosec
+		e.data = *(*unsafe.Pointer)(fieldPtr)
 	} else {
-		e.data = fieldPtr //nolint:gosec
+		e.data = fieldPtr
 	}
 	return *(*any)(unsafe.Pointer(&e)) //nolint:gosec
 }

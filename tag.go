@@ -13,7 +13,7 @@ import (
 // obj must be a non-nil pointer to a struct.
 func GetByTag[T any](obj any, tagKey, tagValue string) (T, error) {
 	var zero T
-	e := (*eface)(unsafe.Pointer(&obj))
+	e := (*eface)(unsafe.Pointer(&obj)) //nolint:gosec
 	if e._typ == nil {
 		return zero, fmt.Errorf("saferefl: obj must not be nil")
 	}
@@ -39,7 +39,7 @@ func getByTagWithDesc[T any](objPtr unsafe.Pointer, desc *typeinfo.TypeDescripto
 	if !fm.Type.AssignableTo(wantType) {
 		return zero, &TypeMismatchError{FieldPath: tagPath(tagKey, tagValue), FieldType: fm.Type.String(), WantType: wantType.String()}
 	}
-	fieldPtr := unsafe.Pointer(uintptr(objPtr) + fm.Offset)
+	fieldPtr := unsafe.Pointer(uintptr(objPtr) + fm.Offset) //nolint:gosec
 	if fm.Type == wantType {
 		return *(*T)(fieldPtr), nil
 	}
@@ -61,7 +61,7 @@ func getByTagSlowPath[T any](obj any, e *eface, tagKey, tagValue string, wantTyp
 // SetByTag sets the value of the struct field whose tag key matches tagValue.
 // obj must be a non-nil pointer to a struct.
 func SetByTag[T any](obj any, tagKey, tagValue string, val T) error {
-	e := (*eface)(unsafe.Pointer(&obj))
+	e := (*eface)(unsafe.Pointer(&obj)) //nolint:gosec
 	if e._typ == nil {
 		return fmt.Errorf("saferefl: obj must not be nil")
 	}
@@ -89,7 +89,7 @@ func setByTagWithDesc[T any](objPtr unsafe.Pointer, desc *typeinfo.TypeDescripto
 	if !wantType.AssignableTo(fm.Type) {
 		return &TypeMismatchError{FieldPath: tagPath(tagKey, tagValue), FieldType: fm.Type.String(), WantType: wantType.String()}
 	}
-	fieldPtr := unsafe.Pointer(uintptr(objPtr) + fm.Offset)
+	fieldPtr := unsafe.Pointer(uintptr(objPtr) + fm.Offset) //nolint:gosec
 	if fm.Type == wantType {
 		*(*T)(fieldPtr) = val
 		return nil

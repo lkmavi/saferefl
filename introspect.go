@@ -12,7 +12,7 @@ func KindOf(v any) reflect.Kind {
 	if v == nil {
 		return reflect.Invalid
 	}
-	e := (*eface)(unsafe.Pointer(&v))
+	e := (*eface)(unsafe.Pointer(&v)) //nolint:gosec
 	if e._typ == nil {
 		return reflect.Invalid
 	}
@@ -29,7 +29,7 @@ func IsNil(v any) bool {
 	if v == nil {
 		return true
 	}
-	e := (*eface)(unsafe.Pointer(&v))
+	e := (*eface)(unsafe.Pointer(&v)) //nolint:gosec
 	if e._typ == nil {
 		return true
 	}

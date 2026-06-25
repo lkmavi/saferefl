@@ -34,8 +34,8 @@ func init() {
 	// If the layout ever changes, Get/Set return wrong errors instead of corrupting data,
 	// but we want to catch this early rather than emit confusing diagnostics.
 	var x *int
-	iface := (any)(x)
-	e := (*eface)(unsafe.Pointer(&iface))
+	iface := any(x)
+	e := (*eface)(unsafe.Pointer(&iface)) //nolint:gosec
 	if efaceKind(e._typ) != reflect.Pointer {
 		msg := "[saferefl] efaceKind self-test FAILED — abi.Type.Kind_ offset is wrong for this Go version; Get/Set will return incorrect errors"
 		if _, strict := os.LookupEnv("SAFEREFL_STRICT"); strict {

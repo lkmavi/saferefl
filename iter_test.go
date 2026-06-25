@@ -6,6 +6,17 @@ import (
 	"github.com/lkmavi/saferefl"
 )
 
+// Fixtures for fallback-path (eachFieldRec / recurseEmbedded) coverage.
+// These structs have no exported fields, so buildIterPlan returns nil
+// and EachField/ToMap fall back to the reflect-based recursive path.
+
+type unexportedOnly struct{ x, y int }
+
+type hiddenInner struct{ z int }
+
+type withValueEmbed struct{ hiddenInner } // anonymous value-embedded, all-unexported inner
+type withPtrEmbed struct{ *hiddenInner }  // anonymous pointer-embedded, all-unexported inner
+
 // --- EachField ---
 
 func TestEachField_basic(t *testing.T) {
@@ -165,6 +176,55 @@ func TestMapForEach_stopEarly(t *testing.T) {
 	})
 	if count != 2 {
 		t.Errorf("expected early stop after 2, got %d", count)
+	}
+}
+
+// --- eachFieldRec / recurseEmbedded fallback path ---
+
+func TestEachField_fallback_noExportedFields(t *testing.T) {
+	s := &unexportedOnly{x: 1, y: 2}
+	var count int
+	if err := saferefl.EachField(s, func(_ string, _ any) bool { count++; return true }); err != nil {
+		t.Fatalf("EachField: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 fields for all-unexported struct, got %d", count)
+	}
+}
+
+func TestEachField_fallback_valueEmbedUnexported(t *testing.T) {
+	// Anonymous value-embedded struct with no exported fields → recurseEmbedded reflect.Struct case.
+	s := &withValueEmbed{hiddenInner: hiddenInner{z: 1}}
+	var count int
+	if err := saferefl.EachField(s, func(_ string, _ any) bool { count++; return true }); err != nil {
+		t.Fatalf("EachField: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 fields, got %d", count)
+	}
+}
+
+func TestEachField_fallback_ptrEmbedNilUnexported(t *testing.T) {
+	// Anonymous pointer-embedded nil → recurseEmbedded reflect.Pointer nil case.
+	s := &withPtrEmbed{}
+	var count int
+	if err := saferefl.EachField(s, func(_ string, _ any) bool { count++; return true }); err != nil {
+		t.Fatalf("EachField: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 fields, got %d", count)
+	}
+}
+
+func TestEachField_fallback_ptrEmbedNonNilUnexported(t *testing.T) {
+	// Anonymous pointer-embedded non-nil → recurseEmbedded reflect.Pointer non-nil case.
+	s := &withPtrEmbed{hiddenInner: &hiddenInner{z: 5}}
+	var count int
+	if err := saferefl.EachField(s, func(_ string, _ any) bool { count++; return true }); err != nil {
+		t.Fatalf("EachField: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 fields, got %d", count)
 	}
 }
 

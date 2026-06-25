@@ -66,25 +66,12 @@ func eachFieldRec(objPtr unsafe.Pointer, desc *typeinfo.TypeDescriptor, baseOffs
 		absOffset := baseOffset + fm.Offset
 
 		if fm.Anonymous {
-			switch fm.Kind {
-			case reflect.Struct:
-				sub := typeinfo.TypeDescriptorOf(fm.Type)
-				if !eachFieldRec(objPtr, sub, absOffset, fn) {
+			handled, ok := recurseEmbedded(objPtr, fm, absOffset, fn)
+			if handled {
+				if !ok {
 					return false
 				}
 				continue
-			case reflect.Pointer:
-				if fm.Type.Elem().Kind() == reflect.Struct {
-					inner := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(objPtr) + absOffset)) //nolint:gosec
-					if inner == nil {
-						continue
-					}
-					sub := typeinfo.TypeDescriptorOf(fm.Type.Elem())
-					if !eachFieldRec(inner, sub, 0, fn) {
-						return false
-					}
-					continue
-				}
 			}
 		}
 
@@ -99,6 +86,28 @@ func eachFieldRec(objPtr unsafe.Pointer, desc *typeinfo.TypeDescriptor, baseOffs
 		}
 	}
 	return true
+}
+
+// recurseEmbedded handles value-embedded structs and pointer-embedded structs inside eachFieldRec.
+// Returns (handled=true) when the field was processed as an embedded type, with ok=false
+// meaning fn stopped early.
+func recurseEmbedded(objPtr unsafe.Pointer, fm *typeinfo.FieldMeta, absOffset uintptr, fn func(string, any) bool) (handled, ok bool) {
+	switch fm.Kind {
+	case reflect.Struct:
+		sub := typeinfo.TypeDescriptorOf(fm.Type)
+		return true, eachFieldRec(objPtr, sub, absOffset, fn)
+	case reflect.Pointer:
+		if fm.Type.Elem().Kind() != reflect.Struct {
+			break
+		}
+		inner := *(*unsafe.Pointer)(unsafe.Pointer(uintptr(objPtr) + absOffset)) //nolint:gosec
+		if inner == nil {
+			return true, true
+		}
+		sub := typeinfo.TypeDescriptorOf(fm.Type.Elem())
+		return true, eachFieldRec(inner, sub, 0, fn)
+	}
+	return false, false
 }
 
 // MapForEach calls fn for each key-value pair in m, stopping early if fn returns false.

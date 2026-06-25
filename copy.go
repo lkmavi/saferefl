@@ -80,12 +80,12 @@ func loadCopyPlan(srcDesc, dstDesc *typeinfo.TypeDescriptor) []copyEntry {
 			srcType:   srcFm.Type,
 			dstType:   dstFm.Type,
 		}
-		if srcFm.Type.AssignableTo(dstFm.Type) {
-			// convert = false
-		} else if srcFm.Type.ConvertibleTo(dstFm.Type) {
-			e.convert = true
-		} else {
-			continue // incompatible types: silently skip (DTO mapping pattern)
+		if !srcFm.Type.AssignableTo(dstFm.Type) {
+			if srcFm.Type.ConvertibleTo(dstFm.Type) {
+				e.convert = true
+			} else {
+				continue // incompatible types: silently skip (DTO mapping pattern)
+			}
 		}
 		plan = append(plan, e)
 	}

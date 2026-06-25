@@ -197,6 +197,100 @@ func TestFromMap_nilDst(t *testing.T) {
 	}
 }
 
+// --- Pointer-embedded struct: EmbedChain coverage for flatToMap / flatToMapByTag ---
+
+type ptrEmbedOuter struct {
+	*address // pointer-embedded with exported fields → EmbedChain in IterPlan
+	Name     string
+}
+
+func TestToMap_ptrEmbedNil(t *testing.T) {
+	s := &ptrEmbedOuter{Name: "Eve"} // address pointer is nil
+	m, err := saferefl.ToMap(s)
+	if err != nil {
+		t.Fatalf("ToMap: %v", err)
+	}
+	if m["Name"] != "Eve" {
+		t.Errorf("Name = %v, want Eve", m["Name"])
+	}
+	if _, ok := m["City"]; ok {
+		t.Error("City should be absent when embedded pointer is nil")
+	}
+}
+
+func TestToMap_ptrEmbedNonNil(t *testing.T) {
+	s := &ptrEmbedOuter{Name: "Eve", address: &address{City: "Berlin"}}
+	m, err := saferefl.ToMap(s)
+	if err != nil {
+		t.Fatalf("ToMap: %v", err)
+	}
+	if m["City"] != "Berlin" {
+		t.Errorf("City = %v, want Berlin", m["City"])
+	}
+}
+
+type taggedPtrEmbed struct {
+	*convUser        // pointer-embedded tagged struct
+	Extra     string `json:"extra"`
+}
+
+func TestToMapByTag_ptrEmbedNil(t *testing.T) {
+	s := &taggedPtrEmbed{Extra: "x"} // convUser pointer is nil
+	m, err := saferefl.ToMapByTag(s, "json")
+	if err != nil {
+		t.Fatalf("ToMapByTag: %v", err)
+	}
+	if m["extra"] != "x" {
+		t.Errorf("extra = %v, want x", m["extra"])
+	}
+	if _, ok := m["name"]; ok {
+		t.Error("name should be absent when embedded pointer is nil")
+	}
+}
+
+func TestToMapByTag_ptrEmbedNonNil(t *testing.T) {
+	s := &taggedPtrEmbed{convUser: &convUser{Name: "Eve"}, Extra: "x"}
+	m, err := saferefl.ToMapByTag(s, "json")
+	if err != nil {
+		t.Fatalf("ToMapByTag: %v", err)
+	}
+	if m["name"] != "Eve" {
+		t.Errorf("name = %v, want Eve", m["name"])
+	}
+}
+
+// --- toMapByTagRec fallback path (nil IterPlan, no exported fields) ---
+
+func TestToMapByTag_fallback_noExported(t *testing.T) {
+	m, err := saferefl.ToMapByTag(&withValueEmbed{}, "json")
+	if err != nil {
+		t.Fatalf("ToMapByTag: %v", err)
+	}
+	if len(m) != 0 {
+		t.Errorf("expected empty map, got %v", m)
+	}
+}
+
+func TestToMapByTag_fallback_ptrEmbedNil(t *testing.T) {
+	m, err := saferefl.ToMapByTag(&withPtrEmbed{}, "json")
+	if err != nil {
+		t.Fatalf("ToMapByTag: %v", err)
+	}
+	if len(m) != 0 {
+		t.Errorf("expected empty map, got %v", m)
+	}
+}
+
+func TestToMapByTag_fallback_ptrEmbedNonNil(t *testing.T) {
+	m, err := saferefl.ToMapByTag(&withPtrEmbed{hiddenInner: &hiddenInner{z: 7}}, "json")
+	if err != nil {
+		t.Fatalf("ToMapByTag: %v", err)
+	}
+	if len(m) != 0 {
+		t.Errorf("expected empty map, got %v", m)
+	}
+}
+
 func TestToMap_FromMap_roundtrip(t *testing.T) {
 	src := &convUser{Name: "Frank", Age: 33, Score: 8.0}
 	m, err := saferefl.ToMap(src)

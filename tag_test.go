@@ -153,6 +153,44 @@ func TestSetByTag_tag_not_found(t *testing.T) {
 	}
 }
 
+// --- SetByTag: nil / non-ptr / nil-ptr guard ---
+
+func TestSetByTag_nil_obj(t *testing.T) {
+	if err := saferefl.SetByTag[string](nil, "json", "name", "x"); err == nil {
+		t.Error("expected error for nil obj")
+	}
+}
+
+func TestSetByTag_non_ptr_obj(t *testing.T) {
+	if err := saferefl.SetByTag[string](tagged{}, "json", "name", "x"); err == nil {
+		t.Error("expected error for non-pointer obj")
+	}
+}
+
+func TestSetByTag_nil_ptr(t *testing.T) {
+	if err := saferefl.SetByTag[string]((*tagged)(nil), "json", "name", "x"); err == nil {
+		t.Error("expected error for nil pointer")
+	}
+}
+
+// --- setByTagSlowPath coverage ---
+
+// freshTagged is only used in TestSetByTag_slowPath, so SetByTag is called
+// before GetByTag for this type — the ptr cache is cold and setByTagSlowPath runs.
+type freshTagged struct {
+	Value string `json:"value"`
+}
+
+func TestSetByTag_slowPath(t *testing.T) {
+	u := &freshTagged{}
+	if err := saferefl.SetByTag[string](u, "json", "value", "hello"); err != nil {
+		t.Fatalf("SetByTag slow path: %v", err)
+	}
+	if u.Value != "hello" {
+		t.Errorf("Value = %q, want hello", u.Value)
+	}
+}
+
 // --- errors.Is / errors.As ---
 
 func TestErrors_Is(t *testing.T) {
