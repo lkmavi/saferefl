@@ -57,6 +57,10 @@ func MakeAccessor[T any](obj any, fieldPath string) (Accessor[T], error) {
 // Get reads the field from the struct pointed to by objPtr.
 // objPtr must be the pointer to the same struct type used in [MakeAccessor].
 // Use [UnsafePtrOf] to obtain objPtr from an interface value.
+//
+// For dot-paths that cross pointer-to-struct fields (e.g. "Contact.City"), Get panics
+// with a nil pointer dereference if an intermediate pointer is nil at runtime.
+// Use [Get] with the same path for a descriptive error instead of a panic.
 func (a Accessor[T]) Get(objPtr unsafe.Pointer) T {
 	if a.chain == nil {
 		return *(*T)(unsafe.Pointer(uintptr(objPtr) + a.offset))
@@ -67,6 +71,9 @@ func (a Accessor[T]) Get(objPtr unsafe.Pointer) T {
 // Set writes val to the field in the struct pointed to by objPtr.
 // objPtr must be the pointer to the same struct type used in [MakeAccessor].
 // Use [UnsafePtrOf] to obtain objPtr from an interface value.
+//
+// Panics with nil pointer dereference if an intermediate pointer-to-struct field
+// is nil at runtime. See [Get] for the same caveat.
 func (a Accessor[T]) Set(objPtr unsafe.Pointer, val T) {
 	if a.chain == nil {
 		*(*T)(unsafe.Pointer(uintptr(objPtr) + a.offset)) = val

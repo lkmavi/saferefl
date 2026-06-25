@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 type dumpSample struct {
@@ -23,10 +24,18 @@ func TestStructDump_basic(t *testing.T) {
 		t.Fatalf("StructDump: %v", err)
 	}
 	out := buf.String()
-	// Only fields that start first in their 16-byte row get an annotation.
-	// ID (offset 0) and Score (offset 24) are first in their rows; Name (offset 8)
-	// shares row 0 with ID so it is not annotated — this is by design.
-	for _, want := range []string{"dumpSample", "ID", "Score", "Active"} {
+	// Only the first field that starts in a given 16-byte row gets annotated.
+	// ID (offset 0) is always first in row 0.
+	// Score is always first in row 1: on 64-bit string is 16 bytes so Score lands at offset 24;
+	// on 32-bit string is 8 bytes so Score lands at offset 16 — both are the first field in
+	// the 16–31 byte row.
+	// Active (offset 32 on 64-bit) gets its own row only on 64-bit; on 32-bit it shares
+	// the 16–31 row with Score and is therefore not annotated.
+	must := []string{"dumpSample", "ID", "Score"}
+	if unsafe.Sizeof(uintptr(0)) == 8 {
+		must = append(must, "Active")
+	}
+	for _, want := range must {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}
@@ -46,7 +55,15 @@ func TestStructDump_kindLabels(t *testing.T) {
 		t.Fatalf("StructDump: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"string", "[]int", "*int", "interface"} {
+	// Str (offset 0) and Ptr are always first in their respective rows on all architectures.
+	// On 64-bit: string=16 B, slice=24 B, *int=8 B, any=16 B — each field starts a new row.
+	// On 32-bit: string=8 B and slice=12 B share row 0, *int=4 B is first in row 1,
+	//   and any=8 B shares that row with *int — so "[]int" and "interface" are not annotated.
+	must := []string{"string", "*int"}
+	if unsafe.Sizeof(uintptr(0)) == 8 {
+		must = append(must, "[]int", "interface")
+	}
+	for _, want := range must {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing kind label %q:\n%s", want, out)
 		}

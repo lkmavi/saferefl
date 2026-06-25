@@ -41,8 +41,62 @@
 //	// Map length without reflect.
 //	n := saferefl.MapLenFast(m)
 //
+// # Tag-based access
+//
+// Access fields by struct tag value instead of field name. Useful for ORM-style
+// field mapping where the tag is the canonical identifier:
+//
+//	name, _ := saferefl.GetByTag[string](&user, "json", "name")   // field with `json:"name"`
+//	_        = saferefl.SetByTag[string](&user, "db", "col_name", "Alice")
+//
+// # Iteration and mapping
+//
+// Iterate over all exported fields of a struct in declaration order:
+//
+//	saferefl.EachField(&user, func(name string, val any) bool {
+//	    fmt.Println(name, val)
+//	    return true // false to stop early
+//	})
+//
+// Convert a struct to a map (by field name or struct tag):
+//
+//	m, _  := saferefl.ToMap(&user)
+//	m, _  := saferefl.ToMapByTag(&user, "json")   // keys are tag values
+//	_      = saferefl.FromMap(m, &dst)             // populate struct from map
+//
+// Copy matching exported fields between two structs (DTO-to-entity mapping):
+//
+//	saferefl.CopyFields(&src, &dst)
+//
+// Iterate a typed map with early-stop support:
+//
+//	saferefl.MapForEach(m, func(k string, v int) bool { return true })
+//
+// # Introspection
+//
+// Fast kind and nil checks without reflect.Value boxing:
+//
+//	saferefl.KindOf(v)   // reflect.Kind, ~0.28 ns, 0 allocs
+//	saferefl.IsNil(v)    // true for nil pointer/map/chan/func/slice/interface
+//
+// # TypeDescriptor — low-level cache
+//
+// Direct access to the prebuilt type metadata used internally by all APIs.
+// Useful for plugin authors or code that needs repeated field access without
+// the overhead of the generic Get/Set surface:
+//
+//	desc := saferefl.TypeDescriptorOf(reflect.TypeOf(user{}))
+//	fm   := desc.FieldsByName["Name"]   // *FieldMeta with Offset, Type, Tag, …
+//	fm   = desc.FieldsByTag["json"]["name"]
+//
 // # Error types
 //
-// All errors are typed and work with [errors.As]:
-// [FieldNotFoundError], [TypeMismatchError], [ReadOnlyError].
+// All errors are typed and work with [errors.As] for detail inspection, and with
+// [errors.Is] via sentinel values for simple checks:
+//
+//	errors.Is(err, saferefl.ErrFieldNotFound)
+//	errors.Is(err, saferefl.ErrTypeMismatch)
+//	errors.Is(err, saferefl.ErrReadOnly)
+//
+// Typed variants: [FieldNotFoundError], [TypeMismatchError], [ReadOnlyError].
 package saferefl

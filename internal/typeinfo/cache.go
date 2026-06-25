@@ -87,6 +87,7 @@ func buildDescriptor(t reflect.Type) *TypeDescriptor {
 		}
 	}
 	collectNamed(desc, t, 0)
+	desc.IterPlan = buildIterPlan(t)
 	return desc
 }
 

@@ -9,6 +9,32 @@ import (
 	"github.com/lkmavi/saferefl/internal/typeinfo"
 )
 
+// structPtrOf validates that obj is a non-nil pointer to a struct, resolves its
+// TypeDescriptor (from cache on the hot path, building it on first call), and returns both.
+// Used by EachField, CopyFields, ToMap, etc. — these are not on the Get/Set hot path.
+func structPtrOf(obj any) (*typeinfo.TypeDescriptor, unsafe.Pointer, error) {
+	e := (*eface)(unsafe.Pointer(&obj))
+	if e._typ == nil {
+		return nil, nil, fmt.Errorf("saferefl: obj must not be nil")
+	}
+	if efaceKind(e._typ) != reflect.Pointer {
+		return nil, nil, fmt.Errorf("saferefl: obj must be a pointer to struct, got %v", efaceKind(e._typ))
+	}
+	if e.data == nil {
+		return nil, nil, fmt.Errorf("saferefl: obj pointer must not be nil")
+	}
+	if desc, ok := typeinfo.PtrCacheLoad(uintptr(e._typ)); ok {
+		return desc, e.data, nil
+	}
+	elem := reflect.TypeOf(obj).Elem()
+	if elem.Kind() != reflect.Struct {
+		return nil, nil, fmt.Errorf("saferefl: obj must point to a struct, got pointer to %v", elem.Kind())
+	}
+	desc := typeinfo.TypeDescriptorOf(elem)
+	typeinfo.PtrCacheStore(uintptr(e._typ), desc)
+	return desc, e.data, nil
+}
+
 // resolvePath walks fieldPath (dot-separated segments) from objPtr of structType and
 // returns a pointer to the target field along with its metadata.
 //
