@@ -87,9 +87,6 @@ func setByTagWithDesc[T any](objPtr unsafe.Pointer, desc *typeinfo.TypeDescripto
 	if err != nil {
 		return err
 	}
-	if !fm.Exported {
-		return &ReadOnlyError{FieldPath: tagPath(tagKey, tagValue)}
-	}
 	if !wantType.AssignableTo(fm.Type) {
 		return &TypeMismatchError{FieldPath: tagPath(tagKey, tagValue), FieldType: fm.Type.String(), WantType: wantType.String()}
 	}

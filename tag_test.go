@@ -193,6 +193,85 @@ func TestSetByTag_slowPath(t *testing.T) {
 	}
 }
 
+// --- GetByTag: nil-pointer, slow-path non-struct, concrete-as-interface ---
+
+func TestGetByTag_nilPtrObj(t *testing.T) {
+	_, err := saferefl.GetByTag[string]((*tagged)(nil), "json", "name")
+	if err == nil {
+		t.Fatal("expected error for nil pointer, got nil")
+	}
+}
+
+// getByTagPtrToNonStruct is a fresh type so the ptr cache is cold and
+// getByTagSlowPath runs — exercising the "pointer to non-struct" error branch.
+func TestGetByTag_slowPath_ptrToNonStruct(t *testing.T) {
+	n := 42
+	_, err := saferefl.GetByTag[string](&n, "json", "name")
+	if err == nil {
+		t.Fatal("expected error for pointer to non-struct, got nil")
+	}
+}
+
+// concreteNamer and concreteWithNamer exist so GetByTag[namer] uses the
+// reflect fallback (fm.Type != wantType, AssignableTo true) — covering the
+// new checked-assertion branch added in fix 6.
+type concreteNamer interface{ NameStr() string }
+
+type concreteNamed struct{ val string }
+
+func (c concreteNamed) NameStr() string { return c.val }
+
+type withConcreteNamed struct {
+	N concreteNamed `meta:"obj"`
+}
+
+func TestGetByTag_concreteAsInterface(t *testing.T) {
+	u := &withConcreteNamed{N: concreteNamed{val: "hello"}}
+	got, err := saferefl.GetByTag[concreteNamer](u, "meta", "obj")
+	if err != nil {
+		t.Fatalf("GetByTag concreteAsInterface: %v", err)
+	}
+	if got.NameStr() != "hello" {
+		t.Errorf("got.NameStr() = %q, want hello", got.NameStr())
+	}
+}
+
+// --- SetByTag: slow-path non-struct, concrete-as-interface ---
+
+func TestSetByTag_slowPath_ptrToNonStruct(t *testing.T) {
+	n := 42
+	err := saferefl.SetByTag[string](&n, "json", "name", "x")
+	if err == nil {
+		t.Fatal("expected error for pointer to non-struct, got nil")
+	}
+}
+
+// writerIface, myWriter, and withWriter exist to cover the setSlowPath branch
+// in setByTagWithDesc: T (*myWriter) is assignable to fm.Type (writerIface)
+// but differs, so the slow-path reflect assignment is used.
+type writerIface interface {
+	Write([]byte) (int, error)
+}
+
+type myWriter struct{ written int }
+
+func (w *myWriter) Write(p []byte) (int, error) { w.written += len(p); return len(p), nil }
+
+type withWriter struct {
+	W writerIface `meta:"w"`
+}
+
+func TestSetByTag_concreteAsInterface(t *testing.T) {
+	u := &withWriter{}
+	mw := &myWriter{}
+	if err := saferefl.SetByTag[*myWriter](u, "meta", "w", mw); err != nil {
+		t.Fatalf("SetByTag concreteAsInterface: %v", err)
+	}
+	if u.W != mw {
+		t.Error("field not set correctly")
+	}
+}
+
 // --- errors.Is / errors.As ---
 
 func TestErrors_Is(t *testing.T) {
