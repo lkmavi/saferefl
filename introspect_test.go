@@ -1,6 +1,7 @@
 package saferefl_test
 
 import (
+	"io"
 	"reflect"
 	"testing"
 
@@ -121,5 +122,69 @@ func TestIsNil_nonNilableTypes(t *testing.T) {
 		if saferefl.IsNil(v) {
 			t.Errorf("IsNil(%T{}) = true, want false", v)
 		}
+	}
+}
+
+// --- TypeOf ---
+
+func TestTypeOf_matchesReflect(t *testing.T) {
+	cases := []struct {
+		got  reflect.Type
+		want reflect.Type
+	}{
+		{saferefl.TypeOf[int](), reflect.TypeOf(0)},
+		{saferefl.TypeOf[string](), reflect.TypeOf("")},
+		{saferefl.TypeOf[float64](), reflect.TypeOf(0.0)},
+		{saferefl.TypeOf[bool](), reflect.TypeOf(false)},
+		{saferefl.TypeOf[person](), reflect.TypeOf(person{})},
+		{saferefl.TypeOf[*person](), reflect.TypeOf((*person)(nil))},
+	}
+	for _, tc := range cases {
+		if tc.got != tc.want {
+			t.Errorf("TypeOf[%v] = %v, want %v", tc.want, tc.got, tc.want)
+		}
+	}
+}
+
+func TestTypeOf_interfaceType(t *testing.T) {
+	got := saferefl.TypeOf[error]()
+	want := reflect.TypeOf((*error)(nil)).Elem()
+	if got != want {
+		t.Errorf("TypeOf[error] = %v, want %v", got, want)
+	}
+	if got.Kind() != reflect.Interface {
+		t.Errorf("TypeOf[error].Kind() = %v, want Interface", got.Kind())
+	}
+
+	got = saferefl.TypeOf[io.Reader]()
+	want = reflect.TypeOf((*io.Reader)(nil)).Elem()
+	if got != want {
+		t.Errorf("TypeOf[io.Reader] = %v, want %v", got, want)
+	}
+}
+
+func TestTypeOf_usableAsMapKey(t *testing.T) {
+	m := map[reflect.Type]string{
+		saferefl.TypeOf[int]():    "int",
+		saferefl.TypeOf[string](): "string",
+		saferefl.TypeOf[person](): "person",
+	}
+	if m[saferefl.TypeOf[int]()] != "int" {
+		t.Error("map lookup by TypeOf[int] failed")
+	}
+	if m[saferefl.TypeOf[string]()] != "string" {
+		t.Error("map lookup by TypeOf[string] failed")
+	}
+	if m[saferefl.TypeOf[person]()] != "person" {
+		t.Error("map lookup by TypeOf[person] failed")
+	}
+}
+
+func TestTypeOf_sliceAndMap(t *testing.T) {
+	if got := saferefl.TypeOf[[]int](); got.Kind() != reflect.Slice {
+		t.Errorf("TypeOf[[]int].Kind() = %v, want Slice", got.Kind())
+	}
+	if got := saferefl.TypeOf[map[string]int](); got.Kind() != reflect.Map {
+		t.Errorf("TypeOf[map[string]int].Kind() = %v, want Map", got.Kind())
 	}
 }
