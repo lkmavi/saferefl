@@ -79,6 +79,10 @@
 //	saferefl.KindOf(v)   // reflect.Kind, ~0.28 ns, 0 allocs
 //	saferefl.IsNil(v)    // true for nil pointer/map/chan/func/slice/interface
 //
+// Obtain a reflect.Type from a type parameter — useful as a comparable DI key:
+//
+//	saferefl.TypeOf[MyService]()   // same as reflect.TypeOf((*MyService)(nil)).Elem()
+//
 // # TypeDescriptor — low-level cache
 //
 // Direct access to the prebuilt type metadata used internally by all APIs.

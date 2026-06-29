@@ -19,6 +19,13 @@ func KindOf(v any) reflect.Kind {
 	return efaceKind(e._typ)
 }
 
+// TypeOf returns the [reflect.Type] for T without requiring a value of that type.
+// Equivalent to reflect.TypeOf((*T)(nil)).Elem() but reads more clearly at call sites.
+// Commonly used as a comparable type key in dependency-injection containers and registries.
+func TypeOf[T any]() reflect.Type {
+	return reflect.TypeOf((*T)(nil)).Elem()
+}
+
 // IsNil reports whether v is a nil interface, nil pointer, nil map, nil channel,
 // nil function, or nil slice. Returns false for all non-nilable types (int, string, …).
 //
