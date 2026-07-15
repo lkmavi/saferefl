@@ -1,4 +1,10 @@
 # saferefl
+<h1 align="center" style="background:#0b1e2e;color:#00bfff;padding:20px;border-radius:8px;">
+❄️ Repository has moved ❄️<br>
+<a href="https://github.com/glaciforge/saferefl" style="color:#00bfff;text-decoration:underline;">
+github.com/glaciforge/saferefl
+</a>
+</h1>
 
 [![CI](https://github.com/lkmavi/saferefl/actions/workflows/ci.yml/badge.svg)](https://github.com/lkmavi/saferefl/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/lkmavi/saferefl/branch/main/graph/badge.svg)](https://codecov.io/gh/lkmavi/saferefl)
