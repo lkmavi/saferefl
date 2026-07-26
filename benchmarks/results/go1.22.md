@@ -1,100 +1,147 @@
 # Benchmark Results
 
-**Generated:** 2026-06-23 08:35 UTC  
+**Generated:** 2026-07-26 08:29 UTC  
 **Go:** 1.22  
-**Platform:** linux/arm64  
+**Platform:** linux/amd64  
+**CPU:** Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz  
 
 ## Field Read
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| Reflect | 46.1 | 8 | 1 | — |
-| ReflectFast | 1.70 | 0 | 0 | 27.1× faster |
-| SafeRefl | 22.6 | 0 | 0 | 2.0× faster |
-| Offset | 5.24 | 0 | 0 | 8.8× faster |
-| Accessor | 0.544 | 0 | 0 | 84.6× faster |
-| Native | 0.269 | 0 | 0 | 171.2× faster |
+| Reflect | 58.3 | 8 | 1 | — |
+| ReflectFast | 3.05 | 0 | 0 | 19.1× faster |
+| SafeRefl | 37.2 | 0 | 0 | 1.6× faster |
+| Offset | 9.92 | 0 | 0 | 5.9× faster |
+| Accessor | 0.881 | 0 | 0 | 66.1× faster |
+| Native | 0.529 | 0 | 0 | 110.2× faster |
 
 ## Slice At
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| SafeRefl | 0.544 | 0 | 0 | — |
-| Direct | 0.599 | 0 | 0 | 1.1× slower |
-| Reflect | 1.90 | 0 | 0 | 3.5× slower |
+| SafeRefl | 1.16 | 0 | 0 | — |
+| Direct | 1.16 | 0 | 0 | 1.0× faster |
+| Reflect | 3.68 | 0 | 0 | 3.2× slower |
 
 ## Map Len
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| SafeRefl | 0.479 | 0 | 0 | — |
-| Builtin | 0.279 | 0 | 0 | 1.7× faster |
-| Reflect | 2.18 | 0 | 0 | 4.6× slower |
+| SafeRefl | 0.585 | 0 | 0 | — |
+| Builtin | 0.443 | 0 | 0 | 1.3× faster |
+| Reflect | 3.20 | 0 | 0 | 5.5× slower |
+
+## Kind Of
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 0.752 | 0 | 0 | — |
+| Reflect | 1.74 | 0 | 0 | 2.3× slower |
+
+## Is Nil_ptr
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 2.68 | 0 | 0 | — |
+| Reflect | 2.04 | 0 | 0 | 1.3× faster |
+
+## Each Field
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 41.4 | 0 | 0 | — |
+| Reflect | 148 | 56 | 5 | 3.6× slower |
+| ReflectFull | 150 | 56 | 5 | 3.6× slower |
+| Reflect2 | 21.5 | 0 | 0 | 1.9× faster |
+
+## Copy Fields
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 234 | 0 | 0 | — |
+| Manual | 0.289 | 0 | 0 | 810.2× faster |
+| Reflect | 574 | 80 | 10 | 2.5× slower |
+
+## To Map
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 234 | 336 | 2 | — |
+| Reflect | 541 | 432 | 12 | 2.3× slower |
+| JSON | 2692 | 776 | 25 | 11.5× slower |
+
+## Map For Each
+
+| Variant | ns/op | B/op | allocs/op | vs first |
+|---|---|---|---|---|
+| SafeRefl | 827 | 0 | 0 | — |
+| Range | 859 | 0 | 0 | 1.0× slower |
 
 ## Get_int
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| SafeRefl | 22.5 | 0 | 0 | — |
-| Reflect | 43.8 | 8 | 1 | 1.9× slower |
-| ReflectFast | 1.72 | 0 | 0 | 13.1× faster |
-| Offset | 5.13 | 0 | 0 | 4.4× faster |
-| Accessor | 0.555 | 0 | 0 | 40.6× faster |
-| AccFrom | 1.68 | 0 | 0 | 13.4× faster |
-| Direct | 0.277 | 0 | 0 | 81.3× faster |
+| SafeRefl | 37.1 | 0 | 0 | — |
+| Reflect | 59.7 | 8 | 1 | 1.6× slower |
+| ReflectFast | 3.05 | 0 | 0 | 12.2× faster |
+| Offset | 9.95 | 0 | 0 | 3.7× faster |
+| Accessor | 0.869 | 0 | 0 | 42.7× faster |
+| AccFrom | 2.62 | 0 | 0 | 14.2× faster |
+| Direct | 0.527 | 0 | 0 | 70.3× faster |
 
 ## Set_string
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| SafeRefl | 22.6 | 0 | 0 | — |
-| Reflect | 45.7 | 8 | 1 | 2.0× slower |
-| ReflectFast | 2.92 | 0 | 0 | 7.8× faster |
-| Offset | 6.59 | 0 | 0 | 3.4× faster |
-| Accessor | 0.834 | 0 | 0 | 27.2× faster |
-| AccOn | 2.21 | 0 | 0 | 10.2× faster |
-| Direct | 0.276 | 0 | 0 | 81.9× faster |
+| SafeRefl | 40.5 | 0 | 0 | — |
+| Reflect | 66.2 | 8 | 1 | 1.6× slower |
+| ReflectFast | 4.17 | 0 | 0 | 9.7× faster |
+| Offset | 11.0 | 0 | 0 | 3.7× faster |
+| Accessor | 1.16 | 0 | 0 | 35.0× faster |
+| AccOn | 2.85 | 0 | 0 | 14.2× faster |
+| Direct | 0.596 | 0 | 0 | 67.8× faster |
 
 ## DI Resolve
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| Manual | 0.597 | 0 | 0 | — |
-| SafeRefl | 78.6 | 0 | 0 | 131.7× slower |
-| Accessor | 1.95 | 0 | 0 | 3.3× slower |
-| Reflect2 | 8.83 | 0 | 0 | 14.8× slower |
-| Reflect | 153 | 24 | 3 | 257.0× slower |
+| Manual | 0.583 | 0 | 0 | — |
+| SafeRefl | 124 | 0 | 0 | 211.9× slower |
+| Accessor | 2.93 | 0 | 0 | 5.0× slower |
+| Reflect2 | 14.5 | 0 | 0 | 24.9× slower |
+| Reflect | 234 | 24 | 3 | 401.5× slower |
 
 ## JSON Decode
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| StdlibJSON | 1473 | 392 | 10 | — |
-| SafeRefl | 293 | 0 | 0 | 5.0× faster |
-| Reflect | 1046 | 160 | 20 | 1.4× faster |
-| Reflect2 | 40.2 | 0 | 0 | 36.6× faster |
-| Accessor | 4.43 | 0 | 0 | 332.6× faster |
+| StdlibJSON | 2553 | 392 | 10 | — |
+| SafeRefl | 476 | 0 | 0 | 5.4× faster |
+| Reflect | 1609 | 160 | 20 | 1.6× faster |
+| Reflect2 | 59.3 | 0 | 0 | 43.0× faster |
+| Accessor | 6.37 | 0 | 0 | 400.7× faster |
 
 ## ORM Scan
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| Manual | 9.50 | 0 | 0 | — |
-| SafeRefl | 289 | 0 | 0 | 30.4× slower |
-| Accessor | 7.00 | 0 | 0 | 1.4× faster |
-| Reflect2 | 38.5 | 0 | 0 | 4.0× slower |
-| Reflect | 610 | 80 | 10 | 64.2× slower |
-| Copier | 3762 | 880 | 58 | 395.8× slower |
+| Manual | 11.6 | 0 | 0 | — |
+| SafeRefl | 480 | 0 | 0 | 41.5× slower |
+| Accessor | 11.5 | 0 | 0 | 1.0× faster |
+| Reflect2 | 61.3 | 0 | 0 | 5.3× slower |
+| Reflect | 946 | 80 | 10 | 81.7× slower |
+| Copier | 7076 | 880 | 58 | 610.7× slower |
 
 ## Struct Copy
 
 | Variant | ns/op | B/op | allocs/op | vs first |
 |---|---|---|---|---|
-| Manual | 6.12 | 0 | 0 | — |
-| Accessor | 5.60 | 0 | 0 | 1.1× faster |
-| Reflect2 | 18.7 | 0 | 0 | 3.1× slower |
-| Offset | 88.8 | 0 | 0 | 14.5× slower |
-| Reflect | 487 | 80 | 10 | 79.6× slower |
-| SafeRefl | 273 | 0 | 0 | 44.6× slower |
-| Copier | 1621 | 552 | 32 | 264.7× slower |
+| Manual | 7.24 | 0 | 0 | — |
+| Accessor | 7.37 | 0 | 0 | 1.0× slower |
+| Reflect2 | 29.8 | 0 | 0 | 4.1× slower |
+| Offset | 148 | 0 | 0 | 20.4× slower |
+| Reflect | 699 | 80 | 10 | 96.6× slower |
+| SafeRefl | 473 | 0 | 0 | 65.4× slower |
+| Copier | 3202 | 552 | 32 | 442.3× slower |
 
